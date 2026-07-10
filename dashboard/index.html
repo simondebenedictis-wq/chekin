@@ -1,0 +1,1151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chekin Live Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0d1033;--bg2:#12173d;--bg3:#161e4a;--border:rgba(56,91,248,.2);
+  --text:#e8eaf6;--muted:#8b92c9;--muted2:#5c6399;
+  --green:#2dd4a0;--red:#f85149;--amber:#f5a623;--blue:#385bf8;
+  --navy:#23235d;--font:'Inter',system-ui,sans-serif;--mono:'SF Mono','Fira Code',monospace;
+}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh}
+
+/* HEADER */
+.header{background:linear-gradient(135deg,#23235d 0%,#1a1e52 100%);border-bottom:1px solid rgba(56,91,248,.3);padding:14px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-sep{width:1px;height:20px;background:rgba(255,255,255,.15);margin:0 4px}
+.logo-label{font-size:11px;font-weight:500;color:rgba(255,255,255,.45);text-transform:uppercase;letter-spacing:.1em}
+.header-meta{font-size:12px;color:rgba(255,255,255,.5);text-align:right}
+.header-meta strong{color:#fff;display:block;font-size:13px;margin-bottom:2px}
+
+/* NAV */
+.nav{background:#1a1e52;border-bottom:1px solid rgba(56,91,248,.25);display:flex;padding:0 20px;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.nav-btn{background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:500;padding:11px 14px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;font-family:var(--font);white-space:nowrap}
+.nav-btn:hover{color:rgba(255,255,255,.8)}
+.nav-btn.active{color:#fff;border-bottom-color:#385bf8}
+
+/* REFRESH BAR */
+.refresh-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
+.refresh-info{font-size:11px;color:var(--muted)}
+.refresh-info span{color:var(--green);font-weight:600}
+.refresh-btn{display:flex;align-items:center;gap:8px;background:#385bf8;border:none;color:#fff;font-size:12px;font-weight:700;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:var(--font);transition:all .2s;letter-spacing:.02em}
+.refresh-btn:hover{background:#4a6af9;transform:translateY(-1px)}
+.refresh-btn:active{transform:translateY(0)}
+.refresh-btn.loading{opacity:.7;cursor:not-allowed}
+.spin{display:inline-block;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* CONTENT */
+.content{padding:20px 24px;max-width:1400px;margin:0 auto}
+.tab{display:none}.tab.active{display:block}
+
+/* SECTION TITLE */
+.section-title{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:14px;padding-bottom:7px;border-bottom:1px solid rgba(56,91,248,.2);margin-top:26px}
+.section-title:first-child{margin-top:0}
+
+/* KPI CARDS */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin-bottom:8px}
+.kpi{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.kpi.blue::before{background:linear-gradient(90deg,#385bf8,#23235d)}
+.kpi.green::before{background:linear-gradient(90deg,#2dd4a0,#238636)}
+.kpi.amber::before{background:linear-gradient(90deg,#f5a623,#9e6a03)}
+.kpi.cyan::before{background:linear-gradient(90deg,#2dd4a0,#1a8a6a)}
+.kpi.red::before{background:linear-gradient(90deg,#f85149,#da3633)}
+.kpi.purple::before{background:linear-gradient(90deg,#a371f7,#6e40c9)}
+.kpi-label{font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px}
+.kpi-value{font-size:28px;font-weight:800;color:var(--text);line-height:1;letter-spacing:-1.3px;margin-bottom:4px;font-family:var(--mono)}
+.kpi-sub{font-size:11px;color:var(--muted);margin-bottom:0}
+.kpi-strip{margin-top:12px;padding-top:10px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:5px}
+.kpi-strip-row{display:flex;justify-content:space-between;align-items:center}
+.ks-label{font-size:10px;color:var(--muted)}
+.ks-val{font-weight:700;font-family:var(--mono);font-size:12px}
+
+/* FEATURE KPI (per-feature card, dashboards 2 & 3) */
+.feat-kpi{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;position:relative;overflow:hidden}
+.feat-kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+
+/* GRID HELPERS */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:8px}
+@media(max-width:800px){.grid-2{grid-template-columns:1fr}}
+
+/* PIE / CARD */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:22px 24px;display:flex;flex-direction:column}
+.card-label{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px}
+.pie-wrap{display:flex;align-items:center;gap:24px;flex:1;margin-top:14px;flex-wrap:wrap}
+.pie-canvas-wrap{position:relative;flex-shrink:0;width:160px;height:160px}
+.pie-legend{display:flex;flex-direction:column;gap:14px;flex:1;min-width:140px}
+.pie-item{display:flex;align-items:center;gap:10px}
+.pie-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0}
+.pie-val{font-size:20px;font-weight:800;letter-spacing:-0.5px;line-height:1;font-family:var(--mono)}
+.pie-pct{font-size:11px;color:var(--muted);margin-top:1px}
+
+/* ORIGIN CARDS */
+.origin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:8px}
+.origin-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.origin-tag{display:inline-flex;align-items:center;gap:5px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;padding:2px 8px;border-radius:20px;margin-bottom:10px}
+.tag-dir{background:rgba(88,166,255,.12);color:#58a6ff}
+.tag-ame{background:rgba(163,113,247,.12);color:#a371f7}
+.tag-smb{background:rgba(57,211,83,.12);color:#39d353}
+.tag-sdk{background:rgba(210,153,34,.12);color:#d29922}
+.origin-val{font-size:22px;font-weight:800;letter-spacing:-1px;font-family:var(--mono);margin-bottom:3px}
+.origin-wow{font-size:11px;color:var(--muted);margin-bottom:8px}
+.origin-split{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding-top:8px;border-top:1px solid var(--border)}
+.os-item{font-size:10px;color:var(--muted)}
+.os-item span{color:var(--text);font-weight:600;display:block;font-size:11px}
+.origin-pct{font-size:10px;font-weight:600;color:var(--muted2);margin-top:6px}
+
+/* TABLES */
+.tbl-wrap{overflow-x:auto;margin-bottom:8px;border:1px solid var(--border);border-radius:10px}
+table.dtable{width:100%;border-collapse:collapse;font-size:12px;min-width:600px}
+table.dtable th{text-align:left;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;padding:9px 12px;border-bottom:2px solid var(--border);background:var(--bg2)}
+table.dtable th.ar,table.dtable td.ar{text-align:right}
+table.dtable td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:middle}
+table.dtable tr.total-row td{font-weight:700;background:rgba(56,91,248,.05);border-top:1px solid var(--border)}
+table.dtable tr:last-child td{border-bottom:none}
+table.dtable tr:hover td{background:rgba(255,255,255,.015)}
+.mono{font-family:var(--mono);font-size:12px}
+.g{color:var(--green);font-weight:700}
+.r{color:var(--red);font-weight:700}
+.b{color:#58a6ff;font-weight:700}
+.badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px}
+.badge.up{background:rgba(45,212,160,.1);color:var(--green)}
+.badge.dn{background:rgba(248,81,73,.1);color:var(--red)}
+.badge.fl{background:rgba(139,148,158,.1);color:var(--muted)}
+
+/* CHART CARD */
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:8px}
+.chart-canvas-wrap{position:relative;height:280px;margin-top:14px}
+
+/* LOADING */
+.loading-overlay{display:none;position:fixed;inset:0;background:rgba(13,16,51,.85);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:14px}
+.loading-overlay.show{display:flex}
+.loading-spinner{width:40px;height:40px;border:3px solid rgba(56,91,248,.3);border-top-color:#385bf8;border-radius:50%;animation:spin .8s linear infinite}
+.loading-text{font-size:13px;color:var(--muted);font-weight:500}
+
+/* ERROR BANNER */
+.error-banner{display:none;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--red);margin-bottom:16px}
+.error-banner.show{display:block}
+.info-banner{display:none;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--amber);margin-bottom:16px}
+.info-banner.show{display:block}
+
+/* STATUS */
+.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;box-shadow:0 0 6px var(--green)}
+.status-dot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
+
+/* FOOTER */
+.footer{text-align:center;padding:14px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:8px}
+
+@media(max-width:600px){
+  .header{padding:12px 16px}
+  .header-meta{display:none}
+  .content{padding:14px 12px}
+  .nav-btn{font-size:11px;padding:10px 10px}
+  .grid-2{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text" id="loadingText">Fetching latest data from Google Sheets…</div>
+</div>
+
+<div class="header">
+  <div class="logo">
+    <svg height="28" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="32" height="32" rx="6" fill="#385bf8"/>
+      <path d="M10 16L15 21L22 11" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="40" y="22" font-family="Arial" font-weight="700" font-size="18" fill="white">Chekin</text>
+    </svg>
+    <div class="logo-sep"></div>
+    <span class="logo-label">Live Inventory Dashboard</span>
+  </div>
+  <div class="header-meta">
+    <strong id="headerDate">Loading…</strong>
+    <span id="headerSub">Connected to Google Sheets</span>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showTab('main',this)">🏠 Main Inventory</button>
+  <button class="nav-btn" onclick="showTab('premium',this)">⭐ Premium Features</button>
+  <button class="nav-btn" onclick="showTab('trans',this)">💳 Transactional</button>
+  <button class="nav-btn" onclick="showTab('inbox',this)">📬 Smart Inbox</button>
+</div>
+
+<div class="refresh-bar">
+  <div class="refresh-info">
+    <span class="status-dot" id="statusDot"></span>
+    Data source: Google Sheets &nbsp;·&nbsp; Last refreshed: <span id="lastRefreshed">—</span>
+  </div>
+  <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">
+    <span id="refreshIcon">↻</span> Refresh Data
+  </button>
+</div>
+
+<div class="content">
+  <div class="error-banner" id="errorBanner">⚠️ Live refresh is currently unavailable (the Google Sheet isn't reachable from this browser without a Google login — likely a Workspace sharing restriction). Showing the static baseline snapshot from Jul 10, 2026 instead.</div>
+  <div class="info-banner" id="infoBanner"></div>
+
+<!-- ═══════════════ MAIN INVENTORY TAB ═══════════════ -->
+<div id="main" class="tab active">
+  <div class="section-title">Key Metrics — <span id="main-date-label">—</span></div>
+  <div class="kpi-row" id="main-kpis"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">🏨 / 🏠 Inventory Breakdown</div>
+      <div class="pie-wrap">
+        <div class="pie-canvas-wrap"><canvas id="mainPie"></canvas></div>
+        <div class="pie-legend" id="main-pie-legend"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Segment Breakdown</div>
+      <div class="origin-grid" id="main-segment-cards" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="section-title">Weekly Bookable Unit Trend</div>
+  <div class="chart-card"><div class="chart-canvas-wrap"><canvas id="mainTrendChart"></canvas></div></div>
+
+  <div class="section-title">Segment Distribution — Detail</div>
+  <div class="tbl-wrap">
+    <table class="dtable">
+      <thead><tr><th>Segment</th><th class="ar">This Week</th><th class="ar">vs Last Week</th><th class="ar">Hotels</th><th class="ar">VR Housing</th><th class="ar">Unknown</th><th class="ar">% of Total</th></tr></thead>
+      <tbody id="main-segment-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ PREMIUM FEATURES TAB ═══════════════ -->
+<div id="premium" class="tab">
+  <div class="section-title">Premium Features — <span id="premium-date-label">—</span></div>
+  <div class="kpi-row" id="premium-kpis"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">🏨 / 🏠 Combined Inventory Breakdown</div>
+      <div class="pie-wrap">
+        <div class="pie-canvas-wrap"><canvas id="premiumPie"></canvas></div>
+        <div class="pie-legend" id="premium-pie-legend"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Feature Totals</div>
+      <div class="chart-canvas-wrap" style="height:240px"><canvas id="premiumBarChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Weekly Trend — Premium Feature Activations</div>
+  <div class="chart-card"><div class="chart-canvas-wrap"><canvas id="premiumTrendChart"></canvas></div></div>
+
+  <div class="section-title">Detailed Breakdown</div>
+  <div class="tbl-wrap">
+    <table class="dtable">
+      <thead><tr><th>Feature</th><th class="ar">This Week</th><th class="ar">Last Week</th><th class="ar">vs LW</th><th class="ar">Hotels</th><th class="ar">VR</th><th class="ar">UNK</th><th class="ar">% Δ Jan</th><th class="ar">Cumul. Build</th></tr></thead>
+      <tbody id="premium-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ TRANSACTIONAL TAB ═══════════════ -->
+<div id="trans" class="tab">
+  <div class="section-title">Transactional Products — <span id="trans-date-label">—</span></div>
+  <div class="kpi-row" id="trans-kpis"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">🏨 / 🏠 Combined Inventory Breakdown</div>
+      <div class="pie-wrap">
+        <div class="pie-canvas-wrap"><canvas id="transPie"></canvas></div>
+        <div class="pie-legend" id="trans-pie-legend"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Segment Breakdown (Combined)</div>
+      <div class="origin-grid" id="trans-segment-cards" style="margin-top:14px"></div>
+    </div>
+  </div>
+
+  <div class="section-title">Weekly Trend — Transactional Products</div>
+  <div class="chart-card"><div class="chart-canvas-wrap"><canvas id="transTrendChart"></canvas></div></div>
+
+  <div class="section-title">Segment Comparison by Product</div>
+  <div class="chart-card"><div class="chart-canvas-wrap"><canvas id="transSegmentChart"></canvas></div></div>
+
+  <div class="section-title">Detailed Breakdown</div>
+  <div class="tbl-wrap">
+    <table class="dtable">
+      <thead><tr><th>Product</th><th class="ar">This Week</th><th class="ar">Last Week</th><th class="ar">vs LW</th><th class="ar">Hotels</th><th class="ar">VR</th><th class="ar">UNK</th><th class="ar">% Δ Jan</th><th class="ar">Cumul. Build</th></tr></thead>
+      <tbody id="trans-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ SMART INBOX TAB ═══════════════ -->
+<div id="inbox" class="tab">
+  <div class="section-title">Smart Inbox — <span id="inbox-date-label">—</span></div>
+  <div class="kpi-row" id="inbox-kpis"></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">Channel Split — Active Users</div>
+      <div class="pie-wrap">
+        <div class="pie-canvas-wrap"><canvas id="inboxPie"></canvas></div>
+        <div class="pie-legend" id="inbox-pie-legend"></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-label">Weekly User Activation Growth</div>
+      <div class="chart-canvas-wrap" style="height:240px"><canvas id="inboxGrowthChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Weekly Trend — Total Smart Inbox Users</div>
+  <div class="chart-card"><div class="chart-canvas-wrap"><canvas id="inboxTrendChart"></canvas></div></div>
+</div>
+
+</div><!-- content -->
+
+<div class="footer">
+  Chekin Live Dashboard &nbsp;·&nbsp; Connected to Google Sheets &nbsp;·&nbsp; Jan 2, 2026 baseline
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ════════════════════════════════════════════════════════════════════════
+// CONFIG
+// SHEET_ID points at "Chekin Dashboard Data (Public)" — a copy of the main
+// tracking sheet with the 2 raw-customer-data tabs removed. Its Drive ACL
+// is already set to "anyone with the link", but an anonymous (logged-out)
+// fetch still gets HTTP 403 — that means your Google Workspace admin has an
+// org-wide policy blocking external/anonymous access to Drive files, which
+// overrides the individual file's sharing setting. Until that's lifted (or
+// "File > Share > Publish to web" is used instead, which is a separate
+// mechanism not always subject to the same policy), the Refresh button
+// will fail and the dashboard falls back to the static baseline below.
+// ════════════════════════════════════════════════════════════════════════
+const SHEET_ID = '1V2XqPZ94N0pr80bh2gCJ6TPAQvq1URgkTHeId5t9uGM';
+const CORS_PROXIES = [
+  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
+  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
+];
+
+const SHEETS = {
+  bu:       'BOOKABLE UNITS',
+  idv:      'IDENTITY VERFICATION',
+  remote:   'REMOTE ACCESS',
+  branded:  'BRANDED GUEST APP',
+  guide:    'DIGITAL GUIDEBOOK',
+  einvoice: 'E-INVOICING',
+  tax:      'TOURIST TAXES ',
+  deposit:  'SECURITY DEPOSIT',
+  damage:   'DAMAGE PROTECTION',
+  inbox:    'SMART INBOX',
+};
+
+const COLORS = { hotel:'#2dd4a0', vr:'#385bf8', unk:'#6e7681', dir:'#58a6ff', ame:'#a371f7', smb:'#39d353', sdk:'#d29922' };
+
+// ════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════════════════════════════════
+const fmt = n => (n == null || isNaN(n)) ? '—' : Math.round(n).toLocaleString('en-US');
+const fmtPct = n => (n == null || isNaN(n)) ? '—' : (n >= 0 ? '+' : '') + (n * 100).toFixed(1) + '%';
+const fmtSigned = n => (n == null || isNaN(n)) ? '—' : (n >= 0 ? '+' : '') + fmt(n);
+const clsWow = n => (n == null || isNaN(n)) ? '' : (n >= 0 ? 'g' : 'r');
+// NOTE: table cells combine the align-right helper class "r" with color classes "g"/"r" —
+// since both are single classes of equal specificity, the later CSS rule always wins regardless
+// of which is semantically intended. Use wowColor() + inline style for any right-aligned cell.
+const wowColor = n => (n == null || isNaN(n)) ? 'var(--muted)' : (n >= 0 ? 'var(--green)' : 'var(--red)');
+const num = v => {
+  if (v == null) return 0;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (s === '' || s === '-' || s.startsWith('#')) return 0;
+    const n = parseFloat(s.replace(/,/g, ''));
+    return isNaN(n) ? 0 : n;
+  }
+  return 0;
+};
+const badge = v => {
+  const cls = v > 0 ? 'up' : (v < 0 ? 'dn' : 'fl');
+  return `<span class="badge ${cls}">${fmtSigned(v)}</span>`;
+};
+
+function showTab(id, btn) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// FETCH + PARSE (Google Visualization JSON endpoint — locale-proof)
+// ════════════════════════════════════════════════════════════════════════
+async function fetchViaProxy(url) {
+  let lastErr;
+  for (const build of CORS_PROXIES) {
+    try {
+      const resp = await fetch(build(url));
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const text = await resp.text();
+      if (!text || text.length < 20) throw new Error('empty response');
+      return text;
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('all proxies failed');
+}
+
+function parseGvizDate(v) {
+  if (typeof v !== 'string' || !v.startsWith('Date(')) return null;
+  const parts = v.slice(5, -1).split(',').map(Number);
+  return new Date(parts[0], parts[1], parts[2] || 1);
+}
+
+async function fetchSheetRows(sheetName) {
+  const base = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
+  const text = await fetchViaProxy(base);
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  const json = JSON.parse(text.slice(start, end + 1));
+  const rawRows = (json.table && json.table.rows) || [];
+  const rows = rawRows.map(r => (r.c || []).map(cell => cell ? cell.v : null));
+  // keep only rows whose first column is a real date, sorted most-recent-first
+  const dataRows = rows
+    .map(r => ({ date: parseGvizDate(r[0]), cells: r }))
+    .filter(r => r.date instanceof Date && !isNaN(r.date))
+    .sort((a, b) => b.date - a.date);
+  return dataRows;
+}
+
+function fmtDate(d) {
+  if (!d) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+// ── generic weekly-block parser for feature sheets ───────────────────────
+// offsets: {pctJan,cumul,weekly,tot,H,VR,UNK, dir?,ame?,smb?,sdk?} each origin is {tot,H,VR,UNK} col index or null
+function parseFeatureRows(dataRows, off) {
+  return dataRows.map(({ date, cells }) => {
+    const g = i => (i == null ? null : num(cells[i]));
+    const seg = block => block ? { tot: g(block.tot), H: g(block.H), VR: g(block.VR), UNK: g(block.UNK) } : null;
+    return {
+      date,
+      pctJan: g(off.pctJan),
+      cumul: g(off.cumul),
+      weekly: g(off.weekly),
+      tot: g(off.tot),
+      H: g(off.H),
+      VR: g(off.VR),
+      UNK: g(off.UNK),
+      dir: seg(off.dir),
+      ame: seg(off.ame),
+      smb: seg(off.smb),
+      sdk: seg(off.sdk),
+    };
+  });
+}
+
+const OFFSETS = {
+  bu:      { pctJan:1, cumul:2, weekly:3, tot:4, H:6, VR:7, UNK:8,
+             dir:{tot:17,H:19,VR:20,UNK:21}, ame:{tot:23,H:25,VR:26,UNK:27}, smb:{tot:29,H:31,VR:32,UNK:33}, sdk:{tot:35,H:37,VR:38,UNK:39} },
+  withFiller: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9,
+             dir:{tot:17,H:19,VR:20,UNK:21}, ame:{tot:23,H:25,VR:26,UNK:27}, smb:{tot:29,H:31,VR:32,UNK:33}, sdk:{tot:35,H:37,VR:38,UNK:39} },
+  noFiller: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9,
+             dir:{tot:11,H:13,VR:14,UNK:15}, ame:{tot:17,H:19,VR:20,UNK:21}, smb:{tot:23,H:25,VR:26,UNK:27}, sdk:{tot:29,H:31,VR:32,UNK:33} },
+  basicOnly: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9 },
+};
+
+function parseSecurityDeposit(dataRows) {
+  return dataRows.map(({ date, cells }) => {
+    const g = i => num(cells[i]);
+    const ame = { tot:g(39), H:g(41), VR:g(42), UNK:g(43) };
+    const smb = { tot:g(45), H:g(47), VR:g(48), UNK:g(49) };
+    const sdk = { tot:g(51), H:g(53), VR:g(54), UNK:g(55) };
+    const tot = g(5);
+    const dirTot = tot - ame.tot - smb.tot - sdk.tot;
+    return {
+      date, pctJan: g(2), cumul: g(3), weekly: g(4), tot, H: g(7), VR: g(8), UNK: g(9),
+      newModel: { tot:g(17), H:g(19), VR:g(20), UNK:g(21) },
+      oldModel: { tot:g(23), H:g(25), VR:g(26), UNK:g(27) },
+      dir: { tot: dirTot, H: null, VR: null, UNK: null },
+      ame, smb, sdk,
+    };
+  });
+}
+
+function parseSmartInbox(dataRows) {
+  return dataRows.map(({ date, cells }) => {
+    const g = i => num(cells[i]);
+    return {
+      date,
+      pctSinceMar6: g(1),
+      activationSinceMar6: g(2),
+      weeklyGrowth: g(3),
+      totalUsers: g(4),
+      pctWow: g(5),
+      transactionalChannelUsers: g(6),
+      emailOnlyUsers: g(7),
+      H: g(9), VR: g(10), UNK: g(11),
+    };
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// STATIC BASELINE DATA — baked in as of Jul 10, 2026 (last known-good sheet snapshot).
+// The dashboard renders this immediately on load, then attempts a live refresh which
+// overwrites it if the sheet is reachable. Update this block weekly if live refresh
+// stays unavailable (see README notes below on Workspace sharing restrictions).
+// ════════════════════════════════════════════════════════════════════════
+const STATIC_ROWS = {
+  bu: [
+    [[2026,6,10],0.1546051764,23440,-489,175052,-0.002785674002,77525,94691,2836,null,-1623,-0.0205058877,1116,0.01410016678,18,0.006387508872,null,83519,-1765,35692.0,44991.0,2836.0,null,48876,430,31037.0,17839.0,0.0,null,7033,147,116.0,6917.0,0.0,null,35624,699,10680.0,24944.0,null,null],
+    [[2026,6,3],0.1578305147,23929,3360,175541,0.01951434827,79148,93575,2818,null,2898,0.03800655738,462,0.006059016393,0,0,null,85284,3857,37816.0,44650.0,2818.0,null,48446,253,30834.0,17612.0,0.0,null,6886,-220,116.0,6770.0,0.0,null,34925,-530,10382.0,24543.0,null,null],
+    [[2026,5,26],0.1356686806,20569,-1182,172181,-0.006818063831,76250,93113,2818,null,296,0.003897095611,-1478,-0.01945914633,0,0,null,81427,-1679,34452.0,44157.0,2818.0,null,48193,0,30737.0,17456.0,0.0,null,7106,-86,116.0,6990.0,0.0,null,35455,583,10945.0,24510.0,null,null],
+    [[2026,5,19],0.1434648972,21751,1637,173363,0.009532627558,75954,94591,2818,null,572,0.00758801836,1009,0.01338515826,56,0.02027516293,null,83106,551,34430.0,45858.0,2818.0,null,48193,141,30737.0,17456.0,0.0,null,7192,92,116.0,7076.0,0.0,null,34872,853,10671.0,24201.0,null,null],
+    [[2026,5,12],0.1326675989,20114,885,171726,0.005180255325,75382,93582,2762,null,298,0.003968888179,639,0.008510468276,-52,-0.0184790334,null,82555,253,34194.0,45599.0,2762.0,null,48052,159,30640.0,17412.0,0.0,null,7100,123,116.0,6984.0,0.0,null,34019,350,10432.0,23587.0,null,null],
+    [[2026,5,5],0.1268303301,19229,-8471,170841,-0.04724167931,75084,92943,2814,null,1005,0.01356659782,-9434,-0.1273505312,-42,-0.01470588235,null,82302,644,34028.0,45460.0,2814.0,null,47893,323,30551.0,17342.0,0.0,null,6977,-2060,116.0,6861.0,0.0,null,33669,-7378,10389.0,23280.0,null,null],
+    [[2026,4,29],0.1827032161,27700,2674,179312,0.01513830546,74079,102377,2856,null,1367,0.01880019804,1288,0.01771371988,19,0.006697215368,null,81658,735,33615.0,45187.0,2856.0,null,47570,174,30301.0,17269.0,0.0,null,9037,46,107.0,8930.0,0.0,null,41047,1719,10056.0,30991.0,null,null],
+    [[2026,4,22],0.1650660898,25026,2153,176638,0.01233916956,72712,101089,2837,null,947,0.01319584756,1261,0.01757123946,-55,-0.01901798064,null,80923,806,33270.0,44816.0,2837.0,null,47396,401,30155.0,17241.0,0.0,null,8991,148,107.0,8884.0,0.0,null,39328,798,9180.0,30148.0,null,null],
+    [[2026,4,15],0.1508653669,22873,1440,174485,0.008321534861,71765,99828,2892,null,262,0.003664181922,1269,0.0177475071,-91,-0.03050620181,null,80117,-123,32616.0,44609.0,2892.0,null,46995,387,29910.0,17085.0,0.0,null,8843,-17,112.0,8731.0,0.0,null,38530,1193,9127.0,29403.0,null,null],
+    [[2026,4,8],0.1413674379,21433,533,173045,0.003089640141,71503,98559,2983,null,339,0.004763644539,204,0.002866617953,-10,-0.003341129302,null,80240,48,33033.0,44224.0,2983.0,null,46608,160,29602.0,17006.0,0.0,null,8860,9,112.0,8748.0,0.0,null,37337,316,8756.0,28581.0,null,null],
+    [[2026,4,1],0.1378518851,20900,1442,172512,0.008429297948,71164,98355,2993,null,596,0.00844575445,1014,0.01436911915,-168,-0.05314773806,null,80192,-54509,32939.0,44260.0,2993.0,null,46448,null,29456.0,16992.0,0.0,null,8851,8851,112.0,8739.0,0.0,null,37021,652,8657.0,28364.0,null,null],
+    [[2026,3,24],0.1283407646,19458,574,171070,0.003366647898,70568,97341,3161,null,-113,-0.001598732333,949,0.01342652198,-262,-0.07654104587,null,134701,-585,62096.0,69444.0,3161.0,null,0,0,null,null,null,null,0,0,null,null,null,null,36369,1159,8472.0,27897.0,null,null],
+    [[2026,3,17],0.1245547846,18884,-1435,170496,-0.00834637151,70681,96392,3423,null,-218,-0.003074796542,-674,-0.009506481051,-543,-0.136913767,null,135286,135286,62358.0,69505.0,3423.0,null,null,null,null,null,null,null,null,null,null,null,null,null,35210,35210,8323.0,26887.0,null,null],
+    [[2026,3,10],0.1340197346,20319,22335,171931,0.1493021204,70899.0,97066.0,3966.0,null,8208,0.1309278844,14066,0.2243703243,61,0.01562099872,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+  ],
+  idv: [
+    [[2026,6,10],0.1147773233,0.2202113446,3707,732,20092,0.03780991736,8311,11709,72,null,null,null,null,null,null,null,15970,610,6670.0,9228.0,72.0,null,1113,0,457.0,656.0,0.0,null,841,49,0.0,841.0,0.0,null,2168,73,1184.0,984.0,null,null,null,null],
+    [[2026,6,3],0.1102876251,0.1757561035,2975,-185,19360,-0.009465336403,7886,11402,72,null,null,null,null,null,null,null,15360,-151,6294.0,8994.0,72.0,null,1113,18,481.0,632.0,0.0,null,792,-25,0.0,792.0,0.0,null,2095,-27,1111.0,984.0,null,null,null,null],
+    [[2026,5,26],0.113514267,0.1869913762,3160,-1726,19545,-0.0811433407,7869,11604,72,null,null,null,null,null,null,null,15511,-1778,6325.0,9114.0,72.0,null,1095,-48,481.0,614.0,0.0,null,817,2,0.0,817.0,0.0,null,2122,98,1063.0,1059.0,null,null,null,null],
+    [[2026,5,19],0.1226963077,0.2918134337,4886,984,21271,0.04850396806,8299,12900,72,null,null,null,null,null,null,null,17289,785,6833.0,10384.0,72.0,null,1143,-25,499.0,644.0,0.0,null,815,15,0.0,815.0,0.0,null,2024,209,967.0,1057.0,null,null,null,null],
+    [[2026,5,12],0.1181358676,0.2320539293,3902,79,20287,0.003909342835,7519,12696,72,null,null,null,null,null,null,null,16504,138,6240.0,10192.0,72.0,null,1168,-28,511.0,657.0,0.0,null,800,27,0.0,800.0,0.0,null,1815,-58,768.0,1047.0,null,null,null,null],
+    [[2026,5,5],0.1182854233,0.2272561642,3823,122,20208,0.006073882306,7371,12765,72,null,null,null,null,null,null,null,16366,97,6101.0,10193.0,72.0,null,1196,-49,541.0,655.0,0.0,null,773,-28,0.0,773.0,0.0,null,1873,102,729.0,1144.0,null,null,null,null],
+    [[2026,4,29],0.1120170429,0.2198469574,3701,246,20086,0.01239919355,7320,12694,72,null,null,null,null,null,null,null,16269,154,6061.0,10136.0,72.0,null,1245,22,541.0,704.0,0.0,null,801,23,0.0,801.0,0.0,null,1771,47,718.0,1053.0,null,null,null,null],
+    [[2026,4,22],0.1123201123,0.2049070813,3455,-95,19840,-0.004765487835,7292,12476,72,null,null,null,null,null,null,null,16115,53,6034.0,10009.0,72.0,null,1223,11,546.0,677.0,0.0,null,778,-26,0.0,778.0,0.0,null,1724,-133,712.0,1012.0,null,null,null,null],
+    [[2026,4,15],0.1142505086,0.2106765456,3550,280,19935,0.014245739,7311,12552,72,null,null,null,null,null,null,null,16062,201,5925.0,10065.0,72.0,null,1212,-6,538.0,674.0,0.0,null,804,2,0.0,804.0,0.0,null,1857,83,848.0,1009.0,null,null,null,null],
+    [[2026,4,8],0.113583172,0.1936718086,3270,214,19655,0.01100766421,7179,12404,72,null,null,null,null,null,null,null,15861,138,5799.0,9990.0,72.0,null,1218,7,535.0,683.0,0.0,null,802,23,0.0,802.0,0.0,null,1774,46,845.0,929.0,null,null,null,null],
+    [[2026,4,1],0.1126936097,0.180675331,3056,402,19441,0.02111455434,7121,12248,72,null,null,null,null,null,null,null,15723,-1627,5812.0,9839.0,72.0,null,1211,1211,534.0,677.0,0.0,null,779,779,0.0,779.0,0.0,null,1728,39,775.0,953.0,null,null,null,null],
+    [[2026,3,24],0.1112936225,0.1562613871,2654,371,19039,0.01987358046,6840,12127,72,null,null,null,null,null,null,null,17350,-92,6123.0,11155.0,72.0,null,0,0,null,null,null,null,0,0,null,null,null,null,1689,463,717.0,972.0,null,null,null,null],
+    [[2026,3,17],0.1094923048,0.1337301105,2283,-908,18668,-0.04638332652,6836,11760,72,null,null,null,null,null,null,null,17442,17442,6199.0,11171.0,72.0,null,0,0,null,null,null,null,0,0,null,null,null,null,1226,-398,637.0,589.0,null,null,null,null],
+    [[2026,3,10],0.1138596297,0.1888740435,3191,834,19576,0.04449898623,6760.0,12335.0,481.0,null,null,null,null,null,null,null,0,0,null,null,null,null,0,0,null,null,null,null,0,0,null,null,null,null,1624.0,1624,null,null,null,null,null,null],
+  ],
+  remote: [
+    [[2026,6,10],0.05920526472,0.06658433673,727,502,10364,0.05090245386,4507,5857,0,null,null,null,null,null,null,null,8697,492,3907.0,4790.0,0.0,null,1091,11,578.0,513.0,0.0,null,571,-1,20.0,551.0,0.0,null,5,0,2.0,3.0,0.0,null],
+    [[2026,6,3],0.05618060738,0.01492230112,225,97,9862,0.00993343574,4164,5698,0,null,null,null,null,null,null,null,8205,56,3570.0,4635.0,0.0,null,1080,66,572.0,508.0,0.0,null,572,-25,20.0,552.0,0.0,null,5,0,2.0,3.0,0.0,null],
+    [[2026,5,26],0.05671357467,0.004939796233,128,-1364,9765,-0.1225626741,4161,5604,0,null,null,null,null,null,null,null,8149,-1363,3600.0,4549.0,0.0,null,1014,-19,539.0,475.0,0.0,null,597,18,20.0,577.0,0.0,null,5,0,2.0,3.0,0.0,null],
+    [[2026,5,19],0.06419478205,0.1453123392,1492,300,11129,0.02770338905,4314,6815,0,null,null,null,null,null,null,null,9512,271,3713.0,5799.0,0.0,null,1033,25,579.0,454.0,0.0,null,579,4,20.0,559.0,0.0,null,5,0,2.0,3.0,0.0,null],
+    [[2026,5,12],0.06305975799,0.1144386127,1192,96,10829,0.008944377155,4102,6727,0,null,null,null,null,null,null,null,9241,88,3501.0,5740.0,0.0,null,1008,-8,579.0,429.0,0.0,null,575,23,20.0,555.0,0.0,null,5,-7,2.0,3.0,0.0,null],
+    [[2026,5,5],0.06282449763,0.1045590203,1096,26,10733,0.002428317923,4029,6704,0,null,null,null,null,null,null,null,9153,62,3411.0,5742.0,0.0,null,1016,-37,596.0,420.0,0.0,null,552,-2,20.0,532.0,0.0,null,12,3,2.0,10.0,0.0,null],
+    [[2026,4,29],0.0597115642,0.1018832973,1070,83,10707,0.0078125,4069,6638,0,null,null,null,null,null,null,null,9091,134,3427.0,5664.0,0.0,null,1053,-46,629.0,424.0,0.0,null,554,-5,11.0,543.0,0.0,null,9,0,2.0,7.0,0.0,null],
+    [[2026,4,22],0.06014560853,0.09334156633,987,37,10624,0.003494852177,3986,6638,0,null,null,null,null,null,null,null,8957,6,3320.0,5637.0,0.0,null,1099,51,653.0,446.0,0.0,null,559,-21,11.0,548.0,0.0,null,9,1,2.0,7.0,0.0,null],
+    [[2026,4,15],0.06067570278,0.08953380673,950,245,10587,0.02368980855,3972,6615,0,null,null,null,null,null,null,null,8951,271,3340.0,5611.0,0.0,null,1048,-21,619.0,429.0,0.0,null,580,-5,11.0,569.0,0.0,null,8,0,2.0,6.0,0.0,null],
+    [[2026,4,8],0.05976480106,0.06432026346,705,67,10342,0.006520681265,3751,6591,0,null,null,null,null,null,null,null,8680,73,3106.0,5574.0,0.0,null,1069,-4,632.0,437.0,0.0,null,585,-6,11.0,574.0,0.0,null,8,4,2.0,6.0,0.0,null],
+    [[2026,4,1],0.05956107401,0.05742513121,638,240,10275,0.02391629297,3750,6525,0,null,null,null,null,null,null,null,8607,-1424,3106.0,5501.0,0.0,null,1073,1073,631.0,442.0,0.0,null,591,591,11.0,580.0,0.0,null,4,0,2.0,2.0,0.0,null],
+    [[2026,3,24],0.05866019758,0.03272615005,398,-417,10035,-0.03989667049,3572,6463,0,null,null,null,null,null,null,null,10031,-420,3570.0,6461.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,null,null,0.0,null,4,3,2.0,2.0,0.0,null],
+    [[2026,3,17],0.06130349099,0.07564062982,815,-28,10452,-0.002671755725,4032,6420,0,null,null,null,null,null,null,null,10451,null,4032.0,6419.0,0.0,null,0,null,null,null,0.0,null,0,0,null,null,0.0,null,1,1,0.0,1.0,0.0,null],
+    [[2026,3,10],0.06095468531,0.07852217763,843,-29,10480,-0.002759539442,3968.0,6512.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,0,null,null,null,null,null,0,0,null,null,null,null,0,0,null,null,null,null],
+  ],
+  branded: [
+    [[2026,6,10],0.07660580856,0.04098742431,528,-176,13410,-0.012954512,5212,8167,31,null,null,12478,-272,4925.0,7522.0,31.0,null,614,74,201.0,413.0,0.0,null,232,22,0.0,232.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
+    [[2026,6,3],0.07739502452,0.05464989908,704,183,13586,0.01365365963,5238,8317,31,null,null,12750,164,4969.0,7750.0,31.0,null,540,27,183.0,357.0,0.0,null,210,-8,0.0,210.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
+    [[2026,5,26],0.07784250295,0.04044403043,521,-1370,13403,-0.09273674948,5124,8248,31,null,null,12586,-1361,4872.0,7683.0,31.0,null,513,-7,166.0,347.0,0.0,null,218,-2,0.0,218.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
+    [[2026,5,19],0.08521426141,0.1467939761,1891,239,14773,0.01644419981,5237,9505,31,null,null,13947,235,4991.0,8925.0,31.0,null,520,-15,160.0,360.0,0.0,null,220,4,0.0,220.0,0.0,null,86,15,86.0,0.0,0.0,null,null],
+    [[2026,5,12],0.08463482524,0.1282409564,1652,187,14534,0.01303408378,5133,9370,31,null,null,13712,174,4887.0,8794.0,31.0,null,535,10,175.0,360.0,0.0,null,216,6,0.0,216.0,0.0,null,71,-3,71.0,0.0,0.0,null,null],
+    [[2026,5,5],0.08397867023,0.1137245769,1465,42,14347,0.002936036351,5052,9264,31,null,null,13538,76,4813.0,8694.0,31.0,null,525,8,165.0,360.0,0.0,null,210,-44,0.0,210.0,0.0,null,74,2,74.0,0.0,0.0,null,null],
+    [[2026,4,29],0.07977714821,0.1104642136,1423,87,14305,0.006119004079,5006,9268,31,null,null,13462,80,4769.0,8662.0,31.0,null,517,0,165.0,352.0,0.0,null,254,8,0.0,254.0,0.0,null,72,-1,72.0,0.0,0.0,null,null],
+    [[2026,4,22],0.0804923063,0.1037106039,1336,676,14218,0.04991877123,5029,9158,31,null,null,13382,590,4791.0,8560.0,31.0,null,517,33,165.0,352.0,0.0,null,246,18,0.0,246.0,0.0,null,73,35,73.0,0.0,0.0,null,null],
+    [[2026,4,15],0.07761125598,0.05123428039,660,-648,13542,-0.04566596195,4230,9281,31,null,null,12792,-660,4027.0,8734.0,31.0,null,484,6,165.0,319.0,0.0,null,228,5,0.0,228.0,0.0,null,38,1,38.0,0.0,0.0,null,null],
+    [[2026,4,8],0.08200179144,0.1015370284,1308,102,14190,0.007240204429,4779,9380,31,null,null,13452,90,4577.0,8844.0,31.0,null,478,10,165.0,313.0,0.0,null,223,1,0.0,223.0,0.0,null,37,1,37.0,0.0,0.0,null,null],
+    [[2026,4,1],0.08166388425,0.09361900326,1206,209,14088,0.01505872181,4708,9349,31,null,null,13362,-479,4517.0,8814.0,31.0,null,468,null,155.0,313.0,0.0,null,222,222,0.0,222.0,0.0,null,36,-2,36.0,0.0,0.0,null,null],
+    [[2026,3,24],0.08113053136,0.07739481447,997,724,13879,0.05503610794,4524,9324,31,null,null,13841,724,4488.0,9322.0,31.0,null,0,null,null,null,null,null,0,0,null,null,null,null,38,0,36.0,2.0,0.0,null,null],
+    [[2026,3,17],0.07715723536,0.02119236143,273,-496,13155,-0.03633433448,3750,9374,31,null,null,13117,13117,3714.0,9372.0,31.0,null,0,null,null,null,null,null,0,0,null,null,null,null,38,1,36.0,2.0,0.0,null,null],
+    [[2026,3,10],0.07939813065,0.05969569943,769,-1168,13651,-0.07881773399,4107.0,9513.0,31.0,null,null,0,0,null,null,null,null,0,null,null,null,null,null,0,0,null,null,null,null,37.0,37,null,null,null,null,null],
+  ],
+  guide: [
+    [[2026,6,10],0.02744898659,0.2930570506,4805,514,4805,0.1197855978,2073,2732,0,null,4804,514,2073.0,2731.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,6,3],0.02444443179,0.1547362756,4291,-191,4291,-0.04261490406,1779,2512,0,null,4290,-191,1779.0,2511.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,5,26],0.02603074671,0.2061356297,4482,-335,4482,-0.06954536018,1849,2633,0,null,4481,-335,1849.0,2632.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,5,19],0.027785629,0.2962863294,4817,135,4817,0.0288338317,2002,2815,0,null,4816,135,2002.0,2814.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,5,12],0.027264363,0.2599569429,4682,20,4682,0.00429000429,1938,2744,0,null,4681,21,1938.0,2743.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,-1,0.0,1.0,0.0,null],
+    [[2026,5,5],0.02728853144,0.2545748116,4662,361,4662,0.08393396884,1896,2766,0,null,4660,360,1896.0,2764.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,2,1,0.0,2.0,0.0,null],
+    [[2026,4,29],0.02398612474,0.1574273412,4301,219,4301,0.05365017148,1740,2561,0,null,4300,219,1740.0,2560.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,4,22],0.02310941021,0.09849300323,4082,-2,4082,-0.0004897159647,1661,2421,0,null,4081,-2,1661.0,2420.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,4,15],0.02340602344,0.09903121636,4084,46,4084,0.01139177811,1651,2433,0,null,4083,46,1651.0,2432.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,4,8],0.02333497067,0.08665231432,4038,-145,4038,-0.03466411666,1576,2462,0,null,4037,-145,1576.0,2461.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,4,1],0.02424758857,0.1256727664,4183,-117,4183,-0.02720930233,1576,2607,0,null,4182,-117,1576.0,2606.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
+    [[2026,3,24],0.02513590928,0.1571582347,4300,-17,4300,-0.003937919852,1536,2764,0,null,4299,-17,1536.0,2763.0,0.0,null,0,0,null,null,null,null,0,0,null,null,null,null,1,1,0.0,1.0,0.0,null],
+    [[2026,3,17],0.02532024212,0.1617330463,4317,-399,4317,-0.08460559796,1536,2781,0,null,4316,4316,1536.0,2780.0,0.0,null,0,0,null,null,null,null,0,0,null,null,null,null,null,null,0.0,1.0,0.0,null],
+    [[2026,3,10],0.02742960839,0.2691065662,4716,182,4716,0.04014115571,1817.0,2899.0,0.0,null,0,0,null,null,null,null,0,0,null,null,null,null,0,0,null,null,null,null,0,null,null,null,null,null],
+  ],
+  einvoice: [
+    [[2026,6,10],0.001618857948,8.586206897,215,21,278,0.08171206226,5.0,273,0.0,null,7.0,112.0,null,null,0.0,161.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,6,3],0.001504322733,7.862068966,194,9,257,0.03629032258,5.0,252,0.0,null,5.0,91.0,null,null,0.0,161.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,26],0.001383064156,7.551724138,185,115,248,0.8646616541,5.0,243,0.0,null,5.0,83.0,null,null,0.0,160.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,19],0.0007529523659,3.586206897,70,2,133,0.01526717557,4,129,0.0,null,4.0,81.0,null,null,0.0,48.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,12],0.0007507808694,3.517241379,68,24,131,0.2242990654,4,127,0.0,null,4.0,79.0,null,null,0.0,48.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,5],0.0006183362709,2.689655172,44,2,107,0.01904761905,3,104,0.0,null,3.0,67.0,null,null,0.0,37.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,29],0.0006086533111,2.620689655,42,-27,105,-0.2045454545,1,104,0.0,null,1.0,67.0,null,null,0.0,37.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,22],0.0007716139592,3.551724138,69,27,132,0.2571428571,1,131,0.0,null,1.0,65.0,null,null,0.0,66.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,15],0.0006158502252,2.620689655,42,0,105,0,0.0,105.0,0.0,null,null,null,null,null,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,8],0.0006107101105,2.620689655,42,0,105,0,0.0,105.0,0.0,null,null,null,null,null,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,1],0.0007018904249,2.620689655,42,2,105,0.01941747573,0.0,105.0,0.0,null,null,null,null,null,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,3,24],0.0006868406663,2.551724138,40,1,103,0.009803921569,0.0,103.0,0.0,null,null,null,null,null,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,3,17],0.0006711939356,2.517241379,39,1,102,0.009900990099,0.0,102.0,0.0,null,null,null,null,null,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,3,3],0.0006683076597,2.482758621,38,1,101,0.01,0.0,101.0,0.0,null,null,null,null,null,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
+  ],
+  tax: [
+    [[2026,6,10],0.05058496904,0.4293785311,2606,2272,8855,0.3451313991,2285,6570,0,null,null,null,null,null,null,null,7374,0.3324900614,1976.0,5398.0,0.0,null,552,1.181818182,263.0,289.0,0.0,null,775,0.2052877138,0.0,775.0,0.0,null,154,0.006535947712,46.0,108.0,0.0,null],
+    [[2026,6,3],0.03750121054,0.06263115416,334,70,6583,0.0107477353,1581,5002,0,null,null,null,null,null,null,null,5534,0.01003832816,1449.0,4085.0,0.0,null,253,0.15,86.0,167.0,0.0,null,643,-0.02723146747,0.0,643.0,0.0,null,153,0,46.0,107.0,0.0,null],
+    [[2026,5,26],0.0378264733,0.05133171913,264,-2355,6513,-0.2655615697,1598,4915,0,null,null,null,null,null,null,null,5479,-0.2787942609,1487.0,3992.0,0.0,null,220,-0.4344473008,65.0,155.0,0.0,null,661,-0.09327846365,0.0,661.0,0.0,null,153,0,46.0,107.0,0.0,null],
+    [[2026,5,19],0.05115278347,0.4314769976,2619,151,8868,0.01732247333,2220,6648,0,null,null,null,null,null,null,null,7597,0.007693328028,2013.0,5584.0,0.0,null,389,0.04289544236,161.0,228.0,0.0,null,729,0.02100840336,0.0,729.0,0.0,null,153,0.6813186813,46.0,107.0,0.0,null],
+    [[2026,5,12],0.05076109616,0.407102502,2468,153,8717,0.01786548342,2177,6540,0,null,null,null,null,null,null,null,7539,0.01562710494,1984.0,5555.0,0.0,null,373,0.02472527473,145.0,228.0,0.0,null,714,0.04081632653,0.0,714.0,0.0,null,91,0,48.0,43.0,0.0,null],
+    [[2026,5,5],0.05012848204,0.3824051655,2315,216,8564,0.02587446095,2149,6415,0,null,null,null,null,null,null,null,7423,0.03384401114,1965.0,5458.0,0.0,null,364,0.09309309309,136.0,228.0,0.0,null,686,-0.08042895442,0.0,686.0,0.0,null,91,0.02247191011,48.0,43.0,0.0,null],
+    [[2026,4,29],0.0465557241,0.3475383374,2099,44,8348,0.005298651252,2101,6247,0,null,null,null,null,null,null,null,7180,-0.001390820584,1933.0,5247.0,0.0,null,333,0.02777777778,122.0,211.0,0.0,null,746,0,0.0,746.0,0.0,null,89,1.022727273,46.0,43.0,0.0,null],
+    [[2026,4,22],0.04701140185,0.3404358354,2055,152,8304,0.01864573111,2015,6289,0,null,null,null,null,null,null,null,7190,0.01582367901,1901.0,5289.0,0.0,null,324,0.05194805195,113.0,211.0,0.0,null,746,0.03181189488,0.0,746.0,0.0,null,44,0.02325581395,1.0,43.0,0.0,null],
+    [[2026,4,15],0.04672034845,0.3158999193,1903,61,8152,0.007539241132,1972,6180,0,null,null,null,null,null,null,null,7078,0.008405755806,1870.0,5208.0,0.0,null,308,0,101.0,207.0,0.0,null,723,-0.01229508197,0.0,723.0,0.0,null,43,0.34375,1.0,42.0,0.0,null],
+    [[2026,4,8],0.046756624,0.3060532688,1842,-81,8091,-0.009911894273,1950,6141,0,null,null,null,null,null,null,null,7019,-0.01363125351,1848.0,5171.0,0.0,null,308,-0.01282051282,101.0,207.0,0.0,null,732,0.02808988764,0.0,732.0,0.0,null,32,0,1.0,31.0,0.0,null],
+    [[2026,4,1],0.0473706177,0.3191283293,1923,234,8172,0.02947845805,1899,6273,0,null,null,null,null,null,null,null,7116,-0.09992410827,1797.0,5319.0,0.0,null,312,"#DIV/0!",101.0,211.0,0.0,null,712,"#DIV/0!",0.0,712.0,0.0,null,32,0,1.0,31.0,0.0,null],
+    [[2026,3,24],0.04640205764,0.2813559322,1689,133,7938,0.01704035874,1887,6051,0,null,null,null,null,null,null,null,7906,0.01711051074,1886.0,6020.0,0.0,null,0,"#DIV/0!",null,null,0.0,null,0,"#DIV/0!",null,null,null,null,32,0,1.0,31.0,0.0,null],
+    [[2026,3,17],0.04577820008,0.2598870056,1556,48,7805,0.006187959263,1837,5968,0,null,null,null,null,null,null,null,7773,null,1836.0,5937.0,0.0,null,0,"#DIV/0!",null,null,0.0,null,0,"#DIV/0!",null,null,0.0,null,32,-0.0303030303,1.0,31.0,0.0,null],
+    [[2026,3,10],0.04511693645,0.2521388216,1508,160,7757,0.02106094511,1827.0,5930.0,0.0,null,null,null,null,null,null,null,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,33,"#DIV/0!",1.0,32.0,null,null],
+  ],
+  deposit: [
+    [[2026,6,10],0.02348445033,-0.2726468507,-1554,0,4111,0,185.0,3926.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#REF!",2512,-0.1006086645,183.0,2329.0,0.0,"#REF!",1599,0.2132018209,2,1597,0,null,null,null,null,null,null,null,null,null,null,null,85,null,18.0,67.0,0.0,null,196,null,5.0,191.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,6,3],0.02341903031,-0.2726468507,-1554,0,4111,0,185.0,3926.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#VALUE!",2793,-0.05578093306,160.0,2633.0,0.0,"#VALUE!",1318,0.1431049436,25,1293,0,null,null,null,null,null,null,null,null,null,null,null,85,null,18.0,67.0,0.0,null,165,null,5.0,160.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,5,26],0.02387603743,-0.2726468507,-1554,-557,4111,-0.1193230506,185.0,3926.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#VALUE!",2958,-0.1468128065,151.0,2807.0,0.0,"#VALUE!",1153,-0.03996669442,34,1119,0,null,null,null,null,null,null,null,null,null,null,null,72,null,18.0,54.0,0.0,null,173,null,5.0,168.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,5,19],0.02692616071,-0.1740976645,-997,20,4668,0.00430292599,217.0,4451.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#VALUE!",3467,0.01940605704,183.0,3284.0,0.0,"#VALUE!",1201,-0.03688853248,34,1167,0,null,null,null,null,null,null,null,null,null,null,null,85,null,18.0,67.0,0.0,null,196,null,5.0,191.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,5,12],0.02706637318,-0.177636235,-1017,-6,4648,-0.00128921358,217.0,4431.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.01960681551,3401,0.0100980101,183.0,3218.0,0.0,0.007494497048,1247,-0.03108003108,34,1213,0,null,null,null,null,null,null,null,null,null,null,null,85,null,18.0,67.0,0.0,null,187,null,5.0,182.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,5,5],0.02724170427,-0.1765746638,-1011,-54,4654,-0.01146983857,239.0,4415.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.01968497024,3367,0.001189414213,180.0,3187.0,0.0,0.007872817415,1287,-0.04312267658,59,1228,0,null,null,null,null,null,null,null,null,null,null,null,110,null,43.0,67.0,0.0,null,203,null,5.0,198.0,0.0,null,10,null,0.0,10.0,0.0,null,null],
+    [[2026,4,29],0.02625591148,-0.1670205237,-957,120,4708,0.02615518745,242.0,4466.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.01814156331,3363,0.03381494006,183.0,3180.0,0.0,0.007445123583,1345,0.007490636704,59,1286,0,null,null,null,null,null,null,null,null,null,null,null,130,null,43.0,87.0,0.0,null,233,null,5.0,228.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,4,22],0.02597402597,-0.1882519462,-1077,-66,4588,-0.01418134938,242.0,4346.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.01863698638,3253,-0.01184690158,183.0,3070.0,0.0,0.00771068513,1335,-0.01982378855,59,1276,0,null,null,null,null,null,null,null,null,null,null,null,130,null,43.0,87.0,0.0,null,230,null,5.0,225.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,4,15],0.0266727799,-0.1765746638,-1011,-8,4654,-0.001716001716,229.0,4425.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.01881537095,3292,0.002741395065,170.0,3122.0,0.0,0.00790325816,1362,-0.01232777375,59,1303,0,null,null,null,null,null,null,null,null,null,null,null,130,null,43.0,87.0,0.0,null,233,null,5.0,228.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,4,8],0.02694096911,-0.1751592357,-1003,-55,4662,-0.01165995336,229.0,4433.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.01917998209,3283,-0.01084664055,170.0,3113.0,0.0,0.008078823427,1379,-0.01359084406,59,1320,0,null,null,null,null,null,null,null,null,null,null,null,130,null,43.0,87.0,0.0,null,228,null,5.0,223.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,4,1],0.02734302541,-0.165428167,-948,-18,4717,-0.003801478353,263.0,4454.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02133764608,3319,-0.09834284162,204.0,3115.0,0.0,0.006109719904,1398,0.3263757116,59,1339,0,null,null,null,null,null,null,null,null,null,null,null,130,null,43.0,87.0,0.0,null,245,null,5.0,240.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,3,24],0.02767872801,-0.1622434536,-930,133,4735,0.02890047805,254.0,4481.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02041854212,3681,0.05382192957,245.0,3436.0,0.0,0.006482726369,1054,-0.04959422904,9,1045,0,null,null,null,null,null,null,null,null,null,null,null,0,null,null,null,0.0,null,0,null,null,null,null,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,3,17],0.02699183559,-0.1857749469,-1063,-39,4602,-0.008403361345,229.0,4373.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02051661036,3493,-0.001429388222,218.0,3275.0,0.0,0.006703969595,1109,-0.02974628171,11,1098,0,null,null,null,null,null,null,null,null,null,null,null,0,null,null,null,0.0,null,0,null,null,null,0.0,null,2,null,0.0,2.0,0.0,null,null],
+    [[2026,3,10],0.02699338688,-0.1788747346,-1024,-698,4641,-0.1307360929,219.0,4422.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02015924993,3498,0.00923254472,208.0,3290.0,0.0,0.01089390511,1143,-0.3897490657,11,1132,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,2,null,0.0,2.0,0.0,null,null],
+  ],
+  damage: [
+    [[2026,6,10],0.00710591712,-0.04512635379,-50,-272,1058,-0.2045112782,46,1012,0,null,967,-279,46.0,921.0,0.0,null,14,0,0.0,14.0,0.0,null,77,7,0.0,77.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,6,3],0.009022821633,0.2003610108,222,4,1330,0.003016591252,30,1300,0,null,1246,8,30.0,1216.0,0.0,null,14,0,0.0,14.0,0.0,null,70,-4,0.0,70.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,5,26],0.008958733076,0.1967509025,218,-39,1326,-0.02857142857,30,1296,0,null,1238,-41,30.0,1208.0,0.0,null,14,0,0.0,14.0,0.0,null,74,2,0.0,74.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,5,19],0.009250286318,0.2319494585,257,35,1365,0.02631578947,46,1319,0,null,1279,36,46.0,1233.0,0.0,null,14,0,0.0,14.0,0.0,null,72,-1,0.0,72.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,5,12],0.008997672782,0.2003610108,222,-16,1330,-0.01188707281,46,1284,0,null,1243,-16,46.0,1197.0,0.0,null,14,0,0.0,14.0,0.0,null,73,0,0.0,73.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,5,5],0.009159578088,0.214801444,238,-1,1346,-0.0007423904974,46,1300,0,null,1259,2,46.0,1213.0,0.0,null,14,-2,0.0,14.0,0.0,null,73,-1,0.0,73.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,4,29],0.009303578459,0.2157039711,239,61,1347,0.04743390358,46,1301,0,null,1257,61,46.0,1211.0,0.0,null,16,0,0.0,16.0,0.0,null,74,0,0.0,74.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,4,22],0.008972614687,0.1606498195,178,7,1286,0.005473025801,46,1240,0,null,1196,8,46.0,1150.0,0.0,null,16,0,0.0,16.0,0.0,null,74,-1,0.0,74.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,4,15],0.009009770564,0.15433213,171,12,1279,0.009471191792,46,1233,0,null,1188,8,46.0,1142.0,0.0,null,16,0,0.0,16.0,0.0,null,75,4,0.0,75.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,4,8],0.009360293737,0.1435018051,159,12,1267,0.009561752988,46,1221,0,null,1180,0,46.0,1134.0,0.0,null,16,0,0.0,16.0,0.0,null,71,-2,0.0,71.0,0.0,null,0,null,0.0,0.0,0.0,null],
+    [[2026,4,1],0.009501601266,0.1326714801,147,-12,1255,-0.009471191792,46,1208,1,null,1180,-86,46.0,1134.0,0.0,null,16,16,0.0,16.0,0.0,null,73,73,0.0,73.0,0.0,null,1,null,0.0,1.0,0.0,null],
+    [[2026,3,24],0.009726028449,0.1435018051,159,79,1267,0.0664983165,46,1220,1,null,1266,79,46.0,1220.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,null,0.0,1.0,0.0,null],
+    [[2026,3,17],0.008885564697,0.07220216606,80,-59,1188,-0.04731355253,46,1141,1,null,1187,1187,46.0,1141.0,0.0,null,0,0,null,null,null,null,0,0,null,null,null,null,null,null,0.0,1.0,0.0,null],
+    [[2026,3,10],0.009378337319,0.1254512635,139,-16,1247,-0.0126682502,44.0,1203.0,0.0,null,0,0,null,null,null,null,0,0,null,null,null,null,0,0,null,null,null,null,0,null,null,null,null,null],
+  ],
+  inbox: [
+    [[2026,6,10],1.052083333,101,101,197,-0.09216589862,114,83,null,20.0,94.0,1.0,null,null,83,-0.2314814815,17.0,66.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,6,3],1.260416667,121,121,217,0.01877934272,109,108,null,26.0,83.0,0.0,null,null,108,0.009345794393,21.0,87.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,26],1.21875,117,117,213,0,106,107,null,26.0,80.0,0.0,null,null,107,0,21.0,86.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,19],1.21875,117,117,213,0,106,107,null,26.0,80.0,0.0,null,null,107,0,21.0,86.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,12],1.21875,117,117,213,0,106,107,null,26.0,80.0,0.0,null,null,107,0,21.0,86.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,5,5],1.21875,117,117,213,0.5434782609,106,107,null,26.0,80.0,0.0,null,null,107,0.3896103896,21.0,86.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,29],0.4375,42,42,138,0,61,77,null,12.0,49.0,0.0,null,null,77,0,10.0,67.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,22],0.4375,42,42,138,0,61,77,null,12.0,49.0,0.0,null,null,77,0,10.0,67.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,15],0.4375,42,42,138,0,61,77,null,12.0,49.0,0.0,null,null,77,0,10.0,67.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,8],0.4375,42,42,138,0,61,77,null,12.0,49.0,0.0,null,null,77,0,10.0,67.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,4,1],0.4375,42,42,138,0.2212389381,61,77,null,12.0,49.0,0.0,null,null,77,0.1323529412,10.0,67.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,3,24],0.1770833333,17,17,113,0,45,68,null,5.0,40.0,0.0,null,null,68,0,7.0,61.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,3,17],0.1770833333,17,17,113,0,45,68,null,5.0,40.0,0.0,null,null,68,0,7.0,61.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+    [[2026,3,10],0.1770833333,17,17,113,0,45,68,null,5.0,40.0,0.0,null,null,68,0,7.0,61.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
+  ],
+};
+
+function hydrateFromStatic() {
+  const toDataRows = rows => rows.map(cells => ({ date: new Date(cells[0][0], cells[0][1], cells[0][2]), cells: [null, ...cells.slice(1)] }));
+  DATA.bu = parseFeatureRows(toDataRows(STATIC_ROWS.bu), OFFSETS.bu);
+  DATA.idv = parseFeatureRows(toDataRows(STATIC_ROWS.idv), OFFSETS.withFiller);
+  DATA.remote = parseFeatureRows(toDataRows(STATIC_ROWS.remote), OFFSETS.withFiller);
+  DATA.branded = parseFeatureRows(toDataRows(STATIC_ROWS.branded), OFFSETS.noFiller);
+  DATA.guide = parseFeatureRows(toDataRows(STATIC_ROWS.guide), OFFSETS.noFiller);
+  DATA.tax = parseFeatureRows(toDataRows(STATIC_ROWS.tax), OFFSETS.withFiller);
+  DATA.damage = parseFeatureRows(toDataRows(STATIC_ROWS.damage), OFFSETS.noFiller);
+  DATA.einvoice = parseFeatureRows(toDataRows(STATIC_ROWS.einvoice), OFFSETS.basicOnly);
+  DATA.deposit = parseSecurityDeposit(toDataRows(STATIC_ROWS.deposit));
+  DATA.inbox = parseSmartInbox(toDataRows(STATIC_ROWS.inbox));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// STATE
+// ════════════════════════════════════════════════════════════════════════
+let DATA = { bu: [], idv: [], remote: [], branded: [], guide: [], einvoice: [], tax: [], deposit: [], damage: [], inbox: [] };
+let CHARTS = {};
+
+function destroyChart(id) { if (CHARTS[id]) { CHARTS[id].destroy(); delete CHARTS[id]; } }
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER — shared components
+// ════════════════════════════════════════════════════════════════════════
+function kpiTile(label, value, sub, cls) {
+  return `<div class="kpi ${cls || 'blue'}">
+    <div class="kpi-label">${label}</div>
+    <div class="kpi-value">${value}</div>
+    ${sub ? `<div class="kpi-sub">${sub}</div>` : ''}
+  </div>`;
+}
+
+function renderDoughnut(canvasId, H, VR, UNK) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  const total = (H || 0) + (VR || 0) + (UNK || 0) || 1;
+  CHARTS[canvasId] = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Hotel Rooms', 'VR Housing', 'Unknown'],
+      datasets: [{ data: [H || 0, VR || 0, UNK || 0], backgroundColor: [COLORS.hotel, COLORS.vr, COLORS.unk], borderColor: '#12173d', borderWidth: 3, hoverOffset: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '62%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => ` ${c.label}: ${c.raw.toLocaleString('en-US')} (${(c.raw/total*100).toFixed(1)}%)` } } }
+    }
+  });
+}
+
+function renderPieLegend(containerId, items) {
+  const total = items.reduce((s, i) => s + (i.val || 0), 0) || 1;
+  document.getElementById(containerId).innerHTML = items.map(i => `
+    <div class="pie-item">
+      <div class="pie-dot" style="background:${i.color}"></div>
+      <div>
+        <div class="pie-val" style="color:${i.color}">${fmt(i.val)}</div>
+        <div class="pie-pct">${i.label} · ${(i.val/total*100).toFixed(1)}%</div>
+      </div>
+    </div>`).join('');
+}
+
+function renderLineTrend(canvasId, series, labelsFromRows) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  const labels = labelsFromRows.map(fmtDate);
+  CHARTS[canvasId] = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets: series.map(s => ({ label: s.label, data: s.data, borderColor: s.color, backgroundColor: s.color + '22', tension: .3, fill: !!s.fill, pointRadius: 3 })) },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } }, y: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } } },
+      plugins: { legend: { labels: { color: '#e8eaf6', font: { size: 11 } } } }
+    }
+  });
+}
+
+function renderBarChart(canvasId, labels, data, colors, title) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  CHARTS[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets: [{ label: title || '', data, backgroundColor: colors }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+
+function renderGroupedBarChart(canvasId, labels, datasets) {
+  destroyChart(canvasId);
+  const ctx = document.getElementById(canvasId);
+  if (!ctx) return;
+  CHARTS[canvasId] = new Chart(ctx, {
+    type: 'bar',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } } },
+      plugins: { legend: { labels: { color: '#e8eaf6', font: { size: 11 } } } }
+    }
+  });
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER — MAIN INVENTORY (Dashboard 1)
+// ════════════════════════════════════════════════════════════════════════
+function renderMain() {
+  const rows = DATA.bu;
+  if (!rows.length) return;
+  const tw = rows[0], lw = rows[1] || {};
+  document.getElementById('main-date-label').textContent = `${fmtDate(tw.date)} vs ${fmtDate(lw.date)}`;
+
+  const kpis = [
+    kpiTile('Total Bookable Units', fmt(tw.tot), `vs ${fmt(lw.tot)} last week &nbsp;${badge(tw.tot - (lw.tot||0))}`, 'blue'),
+    kpiTile("% Change Since Jan 2026", fmtPct(tw.pctJan), 'vs Jan 2, 2026 baseline', tw.pctJan >= 0 ? 'green' : 'red'),
+    kpiTile('Cumulative Build Since Feb 2, 2026', fmtSigned(tw.cumul), 'Inventory added since baseline', 'cyan'),
+    kpiTile('Total Inventory (Column E)', fmt(tw.tot), 'Grand total, sheet column E', 'purple'),
+    kpiTile('Weekly Bookable Unit Growth', fmtSigned(tw.weekly), `vs ${fmtDate(lw.date)}`, tw.weekly >= 0 ? 'green' : 'red'),
+  ];
+  document.getElementById('main-kpis').innerHTML = kpis.join('');
+
+  renderDoughnut('mainPie', tw.H, tw.VR, tw.UNK);
+  renderPieLegend('main-pie-legend', [
+    { label: 'Hotel Rooms', val: tw.H, color: COLORS.hotel },
+    { label: 'VR Housing', val: tw.VR, color: COLORS.vr },
+    { label: 'Unknown', val: tw.UNK, color: COLORS.unk },
+  ]);
+
+  const segments = [
+    { key: 'dir', nm: 'Direct Origin', tag: 'tag-dir', color: COLORS.dir },
+    { key: 'ame', nm: 'Amenitiz', tag: 'tag-ame', color: COLORS.ame },
+    { key: 'smb', nm: 'Smoobu', tag: 'tag-smb', color: COLORS.smb },
+    { key: 'sdk', nm: 'SDK', tag: 'tag-sdk', color: COLORS.sdk },
+  ];
+  document.getElementById('main-segment-cards').innerHTML = segments.map(s => {
+    const c = tw[s.key] || {}, p = lw[s.key] || {};
+    const wow = (c.tot || 0) - (p.tot || 0);
+    return `<div class="origin-card">
+      <div class="origin-tag ${s.tag}">${s.nm}</div>
+      <div class="origin-val">${fmt(c.tot)}</div>
+      <div class="origin-wow">vs ${fmt(p.tot)} &nbsp;<span class="${clsWow(wow)}">${fmtSigned(wow)}</span></div>
+      <div class="origin-split">
+        <div class="os-item">Hotels<span>${fmt(c.H)}</span></div>
+        <div class="os-item">VR<span>${fmt(c.VR)}</span></div>
+        <div class="os-item">UNK<span>${fmt(c.UNK)}</span></div>
+      </div>
+      <div class="origin-pct">${((c.tot||0)/(tw.tot||1)*100).toFixed(1)}% of total</div>
+    </div>`;
+  }).join('');
+
+  document.getElementById('main-segment-tbody').innerHTML = segments.map(s => {
+    const c = tw[s.key] || {}, p = lw[s.key] || {};
+    const wow = (c.tot || 0) - (p.tot || 0);
+    const pctOfTotal = (c.tot||0)/(tw.tot||1)*100;
+    return `<tr>
+      <td><span class="origin-tag ${s.tag}" style="margin:0">${s.nm}</span></td>
+      <td class="ar mono">${fmt(c.tot)}</td>
+      <td class="ar mono" style="color:${wowColor(wow)}">${fmtSigned(wow)}</td>
+      <td class="ar mono">${fmt(c.H)}</td>
+      <td class="ar mono">${fmt(c.VR)}</td>
+      <td class="ar mono">${fmt(c.UNK)}</td>
+      <td class="ar mono b">${pctOfTotal.toFixed(1)}%</td>
+    </tr>`;
+  }).join('') + `<tr class="total-row">
+    <td><strong>Grand Total</strong></td>
+    <td class="ar mono b">${fmt(tw.tot)}</td>
+    <td class="ar mono" style="color:${wowColor(tw.tot-(lw.tot||0))}">${fmtSigned(tw.tot-(lw.tot||0))}</td>
+    <td class="ar mono">${fmt(tw.H)}</td><td class="ar mono">${fmt(tw.VR)}</td><td class="ar mono">${fmt(tw.UNK)}</td>
+    <td class="ar mono b">100%</td>
+  </tr>`;
+
+  const hist = rows.slice(0, 16).slice().reverse();
+  renderLineTrend('mainTrendChart', [{ label: 'Bookable Units', data: hist.map(r => r.tot), color: COLORS.vr, fill: true }], hist.map(r => r.date));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER — PREMIUM FEATURES (Dashboard 2)
+// ════════════════════════════════════════════════════════════════════════
+const PREMIUM_FEATURES = [
+  { key: 'idv', nm: 'ID Verification', em: '🆔', cls: 'blue', color: '#385bf8' },
+  { key: 'branded', nm: 'Branded Guest App', em: '📱', cls: 'green', color: '#2dd4a0' },
+  { key: 'remote', nm: 'Remote Access', em: '🔑', cls: 'amber', color: '#f5a623' },
+  { key: 'guide', nm: 'Digital Guidebook', em: '📖', cls: 'cyan', color: '#2dd4a0' },
+  { key: 'einvoice', nm: 'E-Invoicing', em: '🧾', cls: 'purple', color: '#a371f7' },
+];
+
+function renderPremium() {
+  if (!PREMIUM_FEATURES.some(f => DATA[f.key].length)) return;
+  const first = PREMIUM_FEATURES.find(f => DATA[f.key].length);
+  document.getElementById('premium-date-label').textContent = fmtDate(DATA[first.key][0].date);
+
+  document.getElementById('premium-kpis').innerHTML = PREMIUM_FEATURES.map(f => {
+    const rows = DATA[f.key];
+    if (!rows.length) return kpiTile(`${f.em} ${f.nm}`, '—', 'No data', f.cls);
+    const tw = rows[0], lw = rows[1] || {};
+    const wow = tw.weekly;
+    return `<div class="feat-kpi ${f.cls}" style="border-top:3px solid ${f.color}">
+      <div class="kpi-label">${f.em} ${f.nm}</div>
+      <div class="kpi-value">${fmt(tw.tot)}</div>
+      <div class="kpi-sub">vs ${fmt(lw.tot)} &nbsp;<span class="${clsWow(wow)}" style="font-weight:700">${fmtSigned(wow)}</span></div>
+      <div class="kpi-strip">
+        <div class="kpi-strip-row"><span class="ks-label">% Δ Since Jan '26</span><span class="ks-val ${clsWow(tw.pctJan)}">${fmtPct(tw.pctJan)}</span></div>
+        <div class="kpi-strip-row"><span class="ks-label">Cumul. Build</span><span class="ks-val ${clsWow(tw.cumul)}">${fmtSigned(tw.cumul)}</span></div>
+        <div class="kpi-strip-row"><span class="ks-label">Weekly Growth</span><span class="ks-val ${clsWow(wow)}">${fmtSigned(wow)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  let sumH = 0, sumVR = 0, sumUNK = 0;
+  PREMIUM_FEATURES.forEach(f => { const r = DATA[f.key][0]; if (r) { sumH += r.H || 0; sumVR += r.VR || 0; sumUNK += r.UNK || 0; } });
+  renderDoughnut('premiumPie', sumH, sumVR, sumUNK);
+  renderPieLegend('premium-pie-legend', [
+    { label: 'Hotel Rooms', val: sumH, color: COLORS.hotel },
+    { label: 'VR Housing', val: sumVR, color: COLORS.vr },
+    { label: 'Unknown', val: sumUNK, color: COLORS.unk },
+  ]);
+
+  renderBarChart('premiumBarChart', PREMIUM_FEATURES.map(f => f.nm), PREMIUM_FEATURES.map(f => (DATA[f.key][0] || {}).tot || 0), PREMIUM_FEATURES.map(f => f.color), 'Total Active');
+
+  const maxLen = Math.max(...PREMIUM_FEATURES.map(f => DATA[f.key].length), 1);
+  const labelSrcRows = PREMIUM_FEATURES.map(f => DATA[f.key]).sort((a, b) => b.length - a.length)[0] || [];
+  const histDates = labelSrcRows.slice(0, 16).slice().reverse();
+  const series = PREMIUM_FEATURES.map(f => {
+    const rows = DATA[f.key].slice(0, 16).slice().reverse();
+    const byDate = new Map(rows.map(r => [r.date.getTime(), r.tot]));
+    return { label: f.nm, color: f.color, data: histDates.map(r => byDate.get(r.date.getTime()) ?? null) };
+  });
+  renderLineTrend('premiumTrendChart', series, histDates.map(r => r.date));
+
+  document.getElementById('premium-tbody').innerHTML = PREMIUM_FEATURES.map(f => {
+    const rows = DATA[f.key];
+    if (!rows.length) return `<tr><td>${f.em} ${f.nm}</td><td colspan="8" class="ar" style="color:var(--muted)">No data</td></tr>`;
+    const tw = rows[0], lw = rows[1] || {};
+    return `<tr>
+      <td><span style="font-weight:600">${f.em} ${f.nm}</span></td>
+      <td class="ar mono" style="font-weight:700">${fmt(tw.tot)}</td>
+      <td class="ar mono" style="color:var(--muted2)">${fmt(lw.tot)}</td>
+      <td class="ar">${badge(tw.weekly)}</td>
+      <td class="ar mono">${fmt(tw.H)}</td>
+      <td class="ar mono">${fmt(tw.VR)}</td>
+      <td class="ar mono">${fmt(tw.UNK)}</td>
+      <td class="ar mono" style="color:${wowColor(tw.pctJan)}">${fmtPct(tw.pctJan)}</td>
+      <td class="ar mono" style="color:${wowColor(tw.cumul)}">${fmtSigned(tw.cumul)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER — TRANSACTIONAL (Dashboard 3)
+// ════════════════════════════════════════════════════════════════════════
+const TRANS_FEATURES = [
+  { key: 'tax', nm: 'Tourist Taxes', em: '🧾', cls: 'amber', color: '#f5a623' },
+  { key: 'deposit', nm: 'Security Deposit', em: '💳', cls: 'red', color: '#f85149' },
+  { key: 'damage', nm: 'Damage Protection', em: '🛡️', cls: 'green', color: '#2dd4a0' },
+];
+
+function renderTrans() {
+  if (!TRANS_FEATURES.some(f => DATA[f.key].length)) return;
+  const first = TRANS_FEATURES.find(f => DATA[f.key].length);
+  document.getElementById('trans-date-label').textContent = fmtDate(DATA[first.key][0].date);
+
+  document.getElementById('trans-kpis').innerHTML = TRANS_FEATURES.map(f => {
+    const rows = DATA[f.key];
+    if (!rows.length) return kpiTile(`${f.em} ${f.nm}`, '—', 'No data', f.cls);
+    const tw = rows[0], lw = rows[1] || {};
+    const wow = tw.weekly;
+    return `<div class="feat-kpi ${f.cls}" style="border-top:3px solid ${f.color}">
+      <div class="kpi-label">${f.em} ${f.nm}</div>
+      <div class="kpi-value">${fmt(tw.tot)}</div>
+      <div class="kpi-sub">vs ${fmt(lw.tot)} &nbsp;<span class="${clsWow(wow)}" style="font-weight:700">${fmtSigned(wow)}</span></div>
+      <div class="kpi-strip">
+        <div class="kpi-strip-row"><span class="ks-label">% Δ Since Jan '26</span><span class="ks-val ${clsWow(tw.pctJan)}">${fmtPct(tw.pctJan)}</span></div>
+        <div class="kpi-strip-row"><span class="ks-label">Cumul. Build</span><span class="ks-val ${clsWow(tw.cumul)}">${fmtSigned(tw.cumul)}</span></div>
+        <div class="kpi-strip-row"><span class="ks-label">Weekly Growth</span><span class="ks-val ${clsWow(wow)}">${fmtSigned(wow)}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+
+  let sumH = 0, sumVR = 0, sumUNK = 0;
+  TRANS_FEATURES.forEach(f => { const r = DATA[f.key][0]; if (r) { sumH += r.H || 0; sumVR += r.VR || 0; sumUNK += r.UNK || 0; } });
+  renderDoughnut('transPie', sumH, sumVR, sumUNK);
+  renderPieLegend('trans-pie-legend', [
+    { label: 'Hotel Rooms', val: sumH, color: COLORS.hotel },
+    { label: 'VR Housing', val: sumVR, color: COLORS.vr },
+    { label: 'Unknown', val: sumUNK, color: COLORS.unk },
+  ]);
+
+  const segDefs = [
+    { key: 'dir', nm: 'Direct Origin', tag: 'tag-dir', color: COLORS.dir },
+    { key: 'ame', nm: 'Amenitiz', tag: 'tag-ame', color: COLORS.ame },
+    { key: 'smb', nm: 'Smoobu', tag: 'tag-smb', color: COLORS.smb },
+    { key: 'sdk', nm: 'SDK', tag: 'tag-sdk', color: COLORS.sdk },
+  ];
+  const segTotals = segDefs.map(s => {
+    let sum = 0;
+    TRANS_FEATURES.forEach(f => { const r = DATA[f.key][0]; if (r && r[s.key]) sum += r[s.key].tot || 0; });
+    return { ...s, val: sum };
+  });
+  document.getElementById('trans-segment-cards').innerHTML = segTotals.map(s => `
+    <div class="origin-card">
+      <div class="origin-tag ${s.tag}">${s.nm}</div>
+      <div class="origin-val">${fmt(s.val)}</div>
+      <div class="origin-pct">Combined across Tourist Taxes, Security Deposit &amp; Damage Protection</div>
+    </div>`).join('');
+
+  const labelSrcRows = TRANS_FEATURES.map(f => DATA[f.key]).sort((a, b) => b.length - a.length)[0] || [];
+  const histDates = labelSrcRows.slice(0, 16).slice().reverse();
+  const series = TRANS_FEATURES.map(f => {
+    const rows = DATA[f.key].slice(0, 16).slice().reverse();
+    const byDate = new Map(rows.map(r => [r.date.getTime(), r.tot]));
+    return { label: f.nm, color: f.color, data: histDates.map(r => byDate.get(r.date.getTime()) ?? null) };
+  });
+  renderLineTrend('transTrendChart', series, histDates.map(r => r.date));
+
+  renderGroupedBarChart('transSegmentChart', segDefs.map(s => s.nm), TRANS_FEATURES.map(f => ({
+    label: f.nm, backgroundColor: f.color,
+    data: segDefs.map(s => { const r = DATA[f.key][0]; return (r && r[s.key]) ? (r[s.key].tot || 0) : 0; })
+  })));
+
+  document.getElementById('trans-tbody').innerHTML = TRANS_FEATURES.map(f => {
+    const rows = DATA[f.key];
+    if (!rows.length) return `<tr><td>${f.em} ${f.nm}</td><td colspan="8" class="ar" style="color:var(--muted)">No data</td></tr>`;
+    const tw = rows[0], lw = rows[1] || {};
+    return `<tr>
+      <td><span style="font-weight:600">${f.em} ${f.nm}</span></td>
+      <td class="ar mono" style="font-weight:700">${fmt(tw.tot)}</td>
+      <td class="ar mono" style="color:var(--muted2)">${fmt(lw.tot)}</td>
+      <td class="ar">${badge(tw.weekly)}</td>
+      <td class="ar mono">${fmt(tw.H)}</td>
+      <td class="ar mono">${fmt(tw.VR)}</td>
+      <td class="ar mono">${fmt(tw.UNK)}</td>
+      <td class="ar mono" style="color:${wowColor(tw.pctJan)}">${fmtPct(tw.pctJan)}</td>
+      <td class="ar mono" style="color:${wowColor(tw.cumul)}">${fmtSigned(tw.cumul)}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER — SMART INBOX
+// ════════════════════════════════════════════════════════════════════════
+function renderInbox() {
+  const rows = DATA.inbox;
+  if (!rows.length) return;
+  const tw = rows[0], lw = rows[1] || {};
+  document.getElementById('inbox-date-label').textContent = `${fmtDate(tw.date)} vs ${fmtDate(lw.date)}`;
+
+  const kpis = [
+    kpiTile("% Change Since Mar 6, 2026", fmtPct(tw.pctSinceMar6), 'vs Mar 6, 2026 baseline', tw.pctSinceMar6 >= 0 ? 'green' : 'red'),
+    kpiTile('Activation Users Since Mar 6, 2026', fmtSigned(tw.activationSinceMar6), 'Cumulative since baseline', 'cyan'),
+    kpiTile('Weekly Activation Growth', fmtSigned(tw.weeklyGrowth), `vs ${fmtDate(lw.date)}`, tw.weeklyGrowth >= 0 ? 'green' : 'red'),
+    kpiTile('Total Smart Inbox Users', fmt(tw.totalUsers), `vs ${fmt(lw.totalUsers)} last week`, 'blue'),
+    kpiTile('% This Week vs Last Week', fmtPct(tw.pctWow), 'Week-over-week change', tw.pctWow >= 0 ? 'green' : 'red'),
+    kpiTile('Active Users — Transactional Channels', fmt(tw.transactionalChannelUsers), `vs ${fmt(lw.transactionalChannelUsers)} last week`, 'amber'),
+    kpiTile('Active Users — Email Only', fmt(tw.emailOnlyUsers), `vs ${fmt(lw.emailOnlyUsers)} last week`, 'purple'),
+  ];
+  document.getElementById('inbox-kpis').innerHTML = kpis.join('');
+
+  renderDoughnut('inboxPie', null, null, null);
+  destroyChart('inboxPie');
+  const ctx = document.getElementById('inboxPie');
+  CHARTS['inboxPie'] = new Chart(ctx, {
+    type: 'doughnut',
+    data: { labels: ['Transactional Channels', 'Email Only'], datasets: [{ data: [tw.transactionalChannelUsers || 0, tw.emailOnlyUsers || 0], backgroundColor: [COLORS.dir, COLORS.ame], borderColor: '#12173d', borderWidth: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '62%', plugins: { legend: { display: false } } }
+  });
+  renderPieLegend('inbox-pie-legend', [
+    { label: 'Transactional Channels', val: tw.transactionalChannelUsers, color: COLORS.dir },
+    { label: 'Email Only', val: tw.emailOnlyUsers, color: COLORS.ame },
+  ]);
+
+  const hist = rows.slice(0, 16).slice().reverse();
+  renderBarChart('inboxGrowthChart', hist.map(r => fmtDate(r.date)), hist.map(r => r.weeklyGrowth), hist.map(r => r.weeklyGrowth >= 0 ? COLORS.hotel : '#f85149'), 'Weekly Growth');
+  renderLineTrend('inboxTrendChart', [
+    { label: 'Total Users', data: hist.map(r => r.totalUsers), color: COLORS.vr, fill: true },
+    { label: 'Transactional', data: hist.map(r => r.transactionalChannelUsers), color: COLORS.dir },
+    { label: 'Email Only', data: hist.map(r => r.emailOnlyUsers), color: COLORS.ame },
+  ], hist.map(r => r.date));
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// RENDER ALL
+// ════════════════════════════════════════════════════════════════════════
+function renderAll() {
+  renderMain();
+  renderPremium();
+  renderTrans();
+  renderInbox();
+  const bu = DATA.bu[0];
+  if (bu) document.getElementById('headerDate').textContent = `Week of ${fmtDate(bu.date)}`;
+}
+
+// ════════════════════════════════════════════════════════════════════════
+// REFRESH
+// ════════════════════════════════════════════════════════════════════════
+async function refreshData() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  const overlay = document.getElementById('loadingOverlay');
+  const dot = document.getElementById('statusDot');
+  const errorBanner = document.getElementById('errorBanner');
+  const infoBanner = document.getElementById('infoBanner');
+
+  btn.classList.add('loading'); btn.disabled = true;
+  icon.className = 'spin';
+  overlay.classList.add('show');
+  errorBanner.classList.remove('show');
+  infoBanner.classList.remove('show');
+
+  const jobs = [
+    ['bu', SHEETS.bu, OFFSETS.bu],
+    ['idv', SHEETS.idv, OFFSETS.withFiller],
+    ['remote', SHEETS.remote, OFFSETS.withFiller],
+    ['branded', SHEETS.branded, OFFSETS.noFiller],
+    ['guide', SHEETS.guide, OFFSETS.noFiller],
+    ['tax', SHEETS.tax, OFFSETS.withFiller],
+    ['damage', SHEETS.damage, OFFSETS.noFiller],
+  ];
+
+  const failed = [];
+  const results = await Promise.allSettled(jobs.map(([key, sheetName, off]) =>
+    fetchSheetRows(sheetName).then(rows => ({ key, rows: parseFeatureRows(rows, off) }))
+  ));
+  results.forEach((res, i) => {
+    if (res.status === 'fulfilled') DATA[res.value.key] = res.value.rows;
+    else failed.push(jobs[i][1]);
+  });
+
+  const [einvRes, depRes, inboxRes] = await Promise.allSettled([
+    fetchSheetRows(SHEETS.einvoice).then(rows => parseFeatureRows(rows, OFFSETS.basicOnly)),
+    fetchSheetRows(SHEETS.deposit).then(parseSecurityDeposit),
+    fetchSheetRows(SHEETS.inbox).then(parseSmartInbox),
+  ]);
+  if (einvRes.status === 'fulfilled') DATA.einvoice = einvRes.value; else failed.push(SHEETS.einvoice);
+  if (depRes.status === 'fulfilled') DATA.deposit = depRes.value; else failed.push(SHEETS.deposit);
+  if (inboxRes.status === 'fulfilled') DATA.inbox = inboxRes.value; else failed.push(SHEETS.inbox);
+
+  const totalJobs = jobs.length + 3;
+  const allFailed = failed.length === totalJobs;
+  if (allFailed) {
+    dot.className = 'status-dot err';
+    errorBanner.classList.add('show');
+  } else if (failed.length) {
+    dot.className = 'status-dot err';
+    infoBanner.textContent = `⚠️ Some sheets failed to refresh: ${failed.join(', ')}. Showing last known data for those.`;
+    infoBanner.classList.add('show');
+  } else {
+    dot.className = 'status-dot';
+  }
+
+  renderAll();
+
+  if (allFailed) {
+    document.getElementById('lastRefreshed').textContent = 'Static baseline (Jul 10, 2026)';
+  } else {
+    const now = new Date();
+    document.getElementById('lastRefreshed').textContent =
+      now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' · ' +
+      now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
+
+  overlay.classList.remove('show');
+  btn.classList.remove('loading'); btn.disabled = false;
+  icon.className = '';
+}
+
+window.addEventListener('load', () => {
+  hydrateFromStatic();
+  renderAll();
+  document.getElementById('lastRefreshed').textContent = 'Static baseline (Jul 10, 2026)';
+  document.getElementById('headerDate').textContent = 'Week of Jul 10, 2026';
+  refreshData();
+});
+</script>
+</body>
+</html>
