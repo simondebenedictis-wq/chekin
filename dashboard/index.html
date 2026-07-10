@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chekin Live Dashboard</title>
+<title>Chekin Inventory Dashboard</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -27,17 +27,6 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .nav-btn{background:none;border:none;color:rgba(255,255,255,.45);font-size:12px;font-weight:500;padding:11px 14px;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;font-family:var(--font);white-space:nowrap}
 .nav-btn:hover{color:rgba(255,255,255,.8)}
 .nav-btn.active{color:#fff;border-bottom-color:#385bf8}
-
-/* REFRESH BAR */
-.refresh-bar{background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px}
-.refresh-info{font-size:11px;color:var(--muted)}
-.refresh-info span{color:var(--green);font-weight:600}
-.refresh-btn{display:flex;align-items:center;gap:8px;background:#385bf8;border:none;color:#fff;font-size:12px;font-weight:700;padding:8px 18px;border-radius:8px;cursor:pointer;font-family:var(--font);transition:all .2s;letter-spacing:.02em}
-.refresh-btn:hover{background:#4a6af9;transform:translateY(-1px)}
-.refresh-btn:active{transform:translateY(0)}
-.refresh-btn.loading{opacity:.7;cursor:not-allowed}
-.spin{display:inline-block;animation:spin .8s linear infinite}
-@keyframes spin{to{transform:rotate(360deg)}}
 
 /* CONTENT */
 .content{padding:20px 24px;max-width:1400px;margin:0 auto}
@@ -121,22 +110,6 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 .chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:22px 24px;margin-bottom:8px}
 .chart-canvas-wrap{position:relative;height:280px;margin-top:14px}
 
-/* LOADING */
-.loading-overlay{display:none;position:fixed;inset:0;background:rgba(13,16,51,.85);z-index:100;align-items:center;justify-content:center;flex-direction:column;gap:14px}
-.loading-overlay.show{display:flex}
-.loading-spinner{width:40px;height:40px;border:3px solid rgba(56,91,248,.3);border-top-color:#385bf8;border-radius:50%;animation:spin .8s linear infinite}
-.loading-text{font-size:13px;color:var(--muted);font-weight:500}
-
-/* ERROR BANNER */
-.error-banner{display:none;background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.25);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--red);margin-bottom:16px}
-.error-banner.show{display:block}
-.info-banner{display:none;background:rgba(245,166,35,.08);border:1px solid rgba(245,166,35,.25);border-radius:8px;padding:10px 16px;font-size:12px;color:var(--amber);margin-bottom:16px}
-.info-banner.show{display:block}
-
-/* STATUS */
-.status-dot{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block;margin-right:5px;box-shadow:0 0 6px var(--green)}
-.status-dot.err{background:var(--red);box-shadow:0 0 6px var(--red)}
-
 /* FOOTER */
 .footer{text-align:center;padding:14px;font-size:11px;color:var(--muted2);border-top:1px solid var(--border);margin-top:8px}
 
@@ -151,11 +124,6 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 </head>
 <body>
 
-<div class="loading-overlay" id="loadingOverlay">
-  <div class="loading-spinner"></div>
-  <div class="loading-text" id="loadingText">Fetching latest data from Google Sheets…</div>
-</div>
-
 <div class="header">
   <div class="logo">
     <svg height="28" viewBox="0 0 120 32" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -164,11 +132,11 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
       <text x="40" y="22" font-family="Arial" font-weight="700" font-size="18" fill="white">Chekin</text>
     </svg>
     <div class="logo-sep"></div>
-    <span class="logo-label">Live Inventory Dashboard</span>
+    <span class="logo-label">Inventory Dashboard</span>
   </div>
   <div class="header-meta">
-    <strong id="headerDate">Loading…</strong>
-    <span id="headerSub">Connected to Google Sheets</span>
+    <strong id="headerDate">Week of Jul 10, 2026</strong>
+    <span>Data snapshot — updated manually each week</span>
   </div>
 </div>
 
@@ -179,19 +147,7 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
   <button class="nav-btn" onclick="showTab('inbox',this)">📬 Smart Inbox</button>
 </div>
 
-<div class="refresh-bar">
-  <div class="refresh-info">
-    <span class="status-dot" id="statusDot"></span>
-    Data source: Google Sheets &nbsp;·&nbsp; Last refreshed: <span id="lastRefreshed">—</span>
-  </div>
-  <button class="refresh-btn" id="refreshBtn" onclick="refreshData()">
-    <span id="refreshIcon">↻</span> Refresh Data
-  </button>
-</div>
-
 <div class="content">
-  <div class="error-banner" id="errorBanner">⚠️ Live refresh is currently unavailable (the Google Sheet isn't reachable from this browser without a Google login — likely a Workspace sharing restriction). Showing the static baseline snapshot from Jul 10, 2026 instead.</div>
-  <div class="info-banner" id="infoBanner"></div>
 
 <!-- ═══════════════ MAIN INVENTORY TAB ═══════════════ -->
 <div id="main" class="tab active">
@@ -315,42 +271,11 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 </div><!-- content -->
 
 <div class="footer">
-  Chekin Live Dashboard &nbsp;·&nbsp; Connected to Google Sheets &nbsp;·&nbsp; Jan 2, 2026 baseline
+  Chekin Inventory Dashboard &nbsp;·&nbsp; Data snapshot: Jul 10, 2026 &nbsp;·&nbsp; Jan 2, 2026 baseline
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-// ════════════════════════════════════════════════════════════════════════
-// CONFIG
-// SHEET_ID points at "Chekin Dashboard Data (Public)" — a copy of the main
-// tracking sheet with the 2 raw-customer-data tabs removed. Its Drive ACL
-// is already set to "anyone with the link", but an anonymous (logged-out)
-// fetch still gets HTTP 403 — that means your Google Workspace admin has an
-// org-wide policy blocking external/anonymous access to Drive files, which
-// overrides the individual file's sharing setting. Until that's lifted (or
-// "File > Share > Publish to web" is used instead, which is a separate
-// mechanism not always subject to the same policy), the Refresh button
-// will fail and the dashboard falls back to the static baseline below.
-// ════════════════════════════════════════════════════════════════════════
-const SHEET_ID = '1V2XqPZ94N0pr80bh2gCJ6TPAQvq1URgkTHeId5t9uGM';
-const CORS_PROXIES = [
-  u => 'https://corsproxy.io/?url=' + encodeURIComponent(u),
-  u => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u),
-];
-
-const SHEETS = {
-  bu:       'BOOKABLE UNITS',
-  idv:      'IDENTITY VERFICATION',
-  remote:   'REMOTE ACCESS',
-  branded:  'BRANDED GUEST APP',
-  guide:    'DIGITAL GUIDEBOOK',
-  einvoice: 'E-INVOICING',
-  tax:      'TOURIST TAXES ',
-  deposit:  'SECURITY DEPOSIT',
-  damage:   'DAMAGE PROTECTION',
-  inbox:    'SMART INBOX',
-};
-
 const COLORS = { hotel:'#2dd4a0', vr:'#385bf8', unk:'#6e7681', dir:'#58a6ff', ame:'#a371f7', smb:'#39d353', sdk:'#d29922' };
 
 // ════════════════════════════════════════════════════════════════════════
@@ -385,45 +310,6 @@ function showTab(id, btn) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   document.getElementById(id).classList.add('active');
   btn.classList.add('active');
-}
-
-// ════════════════════════════════════════════════════════════════════════
-// FETCH + PARSE (Google Visualization JSON endpoint — locale-proof)
-// ════════════════════════════════════════════════════════════════════════
-async function fetchViaProxy(url) {
-  let lastErr;
-  for (const build of CORS_PROXIES) {
-    try {
-      const resp = await fetch(build(url));
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const text = await resp.text();
-      if (!text || text.length < 20) throw new Error('empty response');
-      return text;
-    } catch (e) { lastErr = e; }
-  }
-  throw lastErr || new Error('all proxies failed');
-}
-
-function parseGvizDate(v) {
-  if (typeof v !== 'string' || !v.startsWith('Date(')) return null;
-  const parts = v.slice(5, -1).split(',').map(Number);
-  return new Date(parts[0], parts[1], parts[2] || 1);
-}
-
-async function fetchSheetRows(sheetName) {
-  const base = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(sheetName)}`;
-  const text = await fetchViaProxy(base);
-  const start = text.indexOf('{');
-  const end = text.lastIndexOf('}');
-  const json = JSON.parse(text.slice(start, end + 1));
-  const rawRows = (json.table && json.table.rows) || [];
-  const rows = rawRows.map(r => (r.c || []).map(cell => cell ? cell.v : null));
-  // keep only rows whose first column is a real date, sorted most-recent-first
-  const dataRows = rows
-    .map(r => ({ date: parseGvizDate(r[0]), cells: r }))
-    .filter(r => r.date instanceof Date && !isNaN(r.date))
-    .sort((a, b) => b.date - a.date);
-  return dataRows;
 }
 
 function fmtDate(d) {
@@ -1084,86 +970,9 @@ function renderAll() {
   if (bu) document.getElementById('headerDate').textContent = `Week of ${fmtDate(bu.date)}`;
 }
 
-// ════════════════════════════════════════════════════════════════════════
-// REFRESH
-// ════════════════════════════════════════════════════════════════════════
-async function refreshData() {
-  const btn = document.getElementById('refreshBtn');
-  const icon = document.getElementById('refreshIcon');
-  const overlay = document.getElementById('loadingOverlay');
-  const dot = document.getElementById('statusDot');
-  const errorBanner = document.getElementById('errorBanner');
-  const infoBanner = document.getElementById('infoBanner');
-
-  btn.classList.add('loading'); btn.disabled = true;
-  icon.className = 'spin';
-  overlay.classList.add('show');
-  errorBanner.classList.remove('show');
-  infoBanner.classList.remove('show');
-
-  const jobs = [
-    ['bu', SHEETS.bu, OFFSETS.bu],
-    ['idv', SHEETS.idv, OFFSETS.withFiller],
-    ['remote', SHEETS.remote, OFFSETS.noFiller],
-    ['branded', SHEETS.branded, OFFSETS.noFiller],
-    ['guide', SHEETS.guide, OFFSETS.noFiller],
-    ['tax', SHEETS.tax, OFFSETS.withFiller],
-    ['damage', SHEETS.damage, OFFSETS.noFiller],
-  ];
-
-  const failed = [];
-  const results = await Promise.allSettled(jobs.map(([key, sheetName, off]) =>
-    fetchSheetRows(sheetName).then(rows => ({ key, rows: parseFeatureRows(rows, off) }))
-  ));
-  results.forEach((res, i) => {
-    if (res.status === 'fulfilled') DATA[res.value.key] = res.value.rows;
-    else failed.push(jobs[i][1]);
-  });
-
-  const [einvRes, depRes, inboxRes] = await Promise.allSettled([
-    fetchSheetRows(SHEETS.einvoice).then(rows => parseFeatureRows(rows, OFFSETS.basicOnly)),
-    fetchSheetRows(SHEETS.deposit).then(parseSecurityDeposit),
-    fetchSheetRows(SHEETS.inbox).then(parseSmartInbox),
-  ]);
-  if (einvRes.status === 'fulfilled') DATA.einvoice = einvRes.value; else failed.push(SHEETS.einvoice);
-  if (depRes.status === 'fulfilled') DATA.deposit = depRes.value; else failed.push(SHEETS.deposit);
-  if (inboxRes.status === 'fulfilled') DATA.inbox = inboxRes.value; else failed.push(SHEETS.inbox);
-
-  const totalJobs = jobs.length + 3;
-  const allFailed = failed.length === totalJobs;
-  if (allFailed) {
-    dot.className = 'status-dot err';
-    errorBanner.classList.add('show');
-  } else if (failed.length) {
-    dot.className = 'status-dot err';
-    infoBanner.textContent = `⚠️ Some sheets failed to refresh: ${failed.join(', ')}. Showing last known data for those.`;
-    infoBanner.classList.add('show');
-  } else {
-    dot.className = 'status-dot';
-  }
-
-  renderAll();
-
-  if (allFailed) {
-    document.getElementById('lastRefreshed').textContent = 'Static baseline (Jul 10, 2026)';
-  } else {
-    const now = new Date();
-    document.getElementById('lastRefreshed').textContent =
-      now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) + ' · ' +
-      now.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  }
-
-  overlay.classList.remove('show');
-  btn.classList.remove('loading'); btn.disabled = false;
-  icon.className = '';
-}
-
 window.addEventListener('load', () => {
   hydrateFromStatic();
   renderAll();
-  document.getElementById('lastRefreshed').textContent = 'Static baseline (Jul 10, 2026)';
-  document.getElementById('headerDate').textContent = 'Week of Jul 10, 2026';
-  refreshData();
 });
 </script>
 </body>
