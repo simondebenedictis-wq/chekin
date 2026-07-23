@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subscriptions Dashboard</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d1033;--bg2:#12173d;--bg3:#161e4a;--border:rgba(56,91,248,.2);
+    --text:#e8eaf6;--muted:#8b92c9;
+    --green:#2dd4a0;--red:#f85149;--amber:#f5a623;--blue:#385bf8;
+    --font:'Inter',system-ui,sans-serif;--mono:'SF Mono','Fira Code',monospace;
+  }
+  body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;padding:24px}
+  .wrap{max-width:1600px;margin:0 auto}
+  .header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px}
+  h1{font-size:20px;font-weight:800}
+  .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+  .refresh-row{display:flex;align-items:center;gap:10px}
+  #lastRefreshed{font-size:12px;color:var(--muted)}
+  button#refreshBtn{
+    background:var(--blue);color:#fff;border:none;border-radius:8px;padding:10px 18px;
+    font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;
+    font-family:var(--font);
+  }
+  button#refreshBtn:disabled{opacity:.6;cursor:not-allowed}
+  .spinner{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;
+    animation:spin .7s linear infinite;display:none}
+  button#refreshBtn.loading .spinner{display:inline-block}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  .error-banner{background:rgba(248,81,73,.12);border:1px solid var(--red);color:#ffb4b0;border-radius:8px;
+    padding:12px 16px;margin-bottom:16px;font-size:13px;display:none}
+  .error-banner.show{display:block}
+
+  .panel-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;
+    margin-bottom:10px}
+  .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:26px}
+  .kpi{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .kpi-label{font-size:9.5px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px}
+  .kpi-value{font-size:20px;font-weight:800;font-family:var(--mono)}
+  .kpi-value.na{font-size:13px;color:var(--muted);font-family:var(--font);font-weight:600}
+
+  .filter-row{margin-bottom:12px;display:flex;gap:10px;align-items:center}
+  #filterInput{background:var(--bg2);border:1px solid var(--border);color:var(--text);border-radius:8px;
+    padding:8px 12px;font-size:13px;font-family:var(--font);width:280px}
+  #filterInput::placeholder{color:var(--muted)}
+  .table-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--bg2)}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;white-space:nowrap}
+  th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--border)}
+  th{background:var(--bg3);color:var(--muted);font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;
+    font-weight:700;cursor:pointer;position:sticky;top:0}
+  th:hover{color:var(--text)}
+  tbody tr:hover{background:rgba(56,91,248,.06)}
+  td.num{font-family:var(--mono);text-align:right}
+  td.na{color:var(--muted);font-style:italic}
+  .footnote{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.5}
+  .status-line{font-size:12px;color:var(--muted);margin:10px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1>Customer / Subscription Dashboard</h1>
+    <div class="header-right">
+      <div class="refresh-row">
+        <span id="lastRefreshed">Last refreshed: never</span>
+        <button id="refreshBtn">
+          <span class="spinner"></span>
+          <span class="btn-label">Refresh Data</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="errorBanner" class="error-banner"></div>
+
+  <div class="panel-title">Company-wide metrics (ProfitWell)</div>
+  <div id="kpiRow" class="kpi-row"></div>
+
+  <div class="filter-row">
+    <input id="filterInput" type="text" placeholder="Filter by email or product...">
+    <span id="rowCount" class="status-line"></span>
+  </div>
+
+  <div class="table-scroll">
+    <table id="dataTable">
+      <thead><tr id="headerRow"></tr></thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    "Lifetime Expansion (estimated)" and "Expected ARR at Renewal (estimated)" are calculated from Stripe invoice
+    history, not official Stripe/ProfitWell metrics. Monthly MRR columns come from paid Stripe invoices grouped by
+    month ("from invoice history") — a blank cell means no paid invoice that month, not zero. Columns marked
+    "N/A — no data source" (next scheduled expansion/downgrade dates, forecasted MRR, renewal probability) have no
+    real data source via the connected Stripe/ProfitWell APIs and are never estimated or fabricated.
+  </div>
+</div>
+
+<script>
+const NA_COLUMNS = [
+  { key: 'nextExpansion', label: 'Next Scheduled Expansion Date' },
+  { key: 'nextDowngrade', label: 'Next Scheduled Downgrade Date' },
+  { key: 'forecast30', label: 'Forecasted MRR (30d)' },
+  { key: 'forecast60', label: 'Forecasted MRR (60d)' },
+  { key: 'forecast90', label: 'Forecasted MRR (90d)' },
+  { key: 'renewalProb', label: 'Renewal Probability' },
+];
+
+const KPI_DEFS = [
+  ['startingMrr', 'Starting MRR'],
+  ['previousMonthMrr', 'Previous Month MRR'],
+  ['currentMrr', 'Current MRR'],
+  ['mrrDelta', 'MRR Delta (MoM)'],
+  ['expansionMrr', 'Expansion MRR'],
+  ['contractionMrr', 'Contraction MRR'],
+  ['churnedMrr', 'Churned MRR'],
+  ['reactivatedMrr', 'Reactivated MRR'],
+];
+
+let currentData = null;
+let sortState = { key: null, dir: 1 };
+
+const fmtMoney = (v) => (v == null || Number.isNaN(v)) ? '' :
+  new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
+const fmtPct = (v) => (v == null || Number.isNaN(v)) ? '' : `${v.toFixed(1)}%`;
+const fmtDate = (unix) => unix == null ? '' : new Date(unix * 1000).toLocaleDateString('en-GB', {
+  year: 'numeric', month: 'short', day: 'numeric',
+});
+
+function setLoading(loading) {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = loading;
+  btn.classList.toggle('loading', loading);
+  btn.querySelector('.btn-label').textContent = loading ? 'Refreshing...' : 'Refresh Data';
+}
+
+function showError(message) {
+  const el = document.getElementById('errorBanner');
+  if (!message) { el.classList.remove('show'); el.textContent = ''; return; }
+  el.textContent = message;
+  el.classList.add('show');
+}
+
+function renderKpis(metrics) {
+  const row = document.getElementById('kpiRow');
+  row.innerHTML = '';
+  if (!metrics || metrics.error) {
+    const div = document.createElement('div');
+    div.className = 'kpi';
+    div.innerHTML = `<div class="kpi-label">ProfitWell</div><div class="kpi-value na">${
+      metrics && metrics.error ? metrics.error : 'Unavailable'
+    }</div>`;
+    row.appendChild(div);
+    return;
+  }
+  for (const [key, label] of KPI_DEFS) {
+    const val = metrics[key];
+    const div = document.createElement('div');
+    div.className = 'kpi';
+    const display = val == null ? 'Not found in ProfitWell response' : fmtMoney(val);
+    div.innerHTML = `<div class="kpi-label">${label}</div><div class="kpi-value ${val == null ? 'na' : ''}">${display}</div>`;
+    row.appendChild(div);
+  }
+}
+
+function baseColumns() {
+  return [
+    { key: 'email', label: 'Customer/Email' },
+    { key: 'subscriptionDate', label: 'Subscription Date' },
+    { key: 'product', label: 'Product' },
+    { key: 'billingCycle', label: 'Billing Cycle' },
+    { key: 'paymentType', label: 'Payment Type' },
+    { key: 'country', label: 'Location/Country' },
+    { key: 'currentMrr', label: 'Current MRR (customer)' },
+    { key: 'renewalDate', label: 'Renewal Date' },
+    { key: 'expectedArrAtRenewal', label: 'Expected ARR at Renewal (estimated)' },
+    { key: 'lifetimeExpansionEur', label: 'Lifetime Expansion € (estimated)' },
+    { key: 'lifetimeExpansionPct', label: 'Lifetime Expansion % (estimated)' },
+  ];
+}
+
+function renderHeader(months, monthLabels) {
+  const headerRow = document.getElementById('headerRow');
+  headerRow.innerHTML = '';
+  const cols = [...baseColumns(), ...months.map((m) => ({ key: `month:${m}`, label: `${monthLabels[m]} (from invoice history)` })), ...NA_COLUMNS];
+  for (const col of cols) {
+    const th = document.createElement('th');
+    th.textContent = col.label;
+    th.title = NA_COLUMNS.some((c) => c.key === col.key)
+      ? 'No real data source via the connected Stripe/ProfitWell APIs — not estimated or fabricated.'
+      : '';
+    th.addEventListener('click', () => {
+      sortState = { key: col.key, dir: sortState.key === col.key ? -sortState.dir : 1 };
+      renderRows();
+    });
+    headerRow.appendChild(th);
+  }
+}
+
+function cellValue(row, key) {
+  if (key.startsWith('month:')) {
+    const m = key.slice(6);
+    return row.monthlyTotals ? row.monthlyTotals[m] : null;
+  }
+  return row[key];
+}
+
+function renderRows() {
+  if (!currentData) return;
+  const filter = document.getElementById('filterInput').value.trim().toLowerCase();
+  let rows = currentData.customers.filter((r) =>
+    !filter || r.email.toLowerCase().includes(filter) || r.product.toLowerCase().includes(filter)
+  );
+
+  if (sortState.key) {
+    rows = [...rows].sort((a, b) => {
+      const av = cellValue(a, sortState.key);
+      const bv = cellValue(b, sortState.key);
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (av > bv) return sortState.dir;
+      if (av < bv) return -sortState.dir;
+      return 0;
+    });
+  }
+
+  document.getElementById('rowCount').textContent = `${rows.length} subscription${rows.length === 1 ? '' : 's'}`;
+
+  const tbody = document.getElementById('tableBody');
+  tbody.innerHTML = '';
+  for (const row of rows) {
+    const tr = document.createElement('tr');
+    const cells = [
+      row.email,
+      fmtDate(row.subscriptionDate),
+      row.product,
+      row.billingCycle,
+      row.paymentType,
+      row.country,
+      fmtMoney(row.currentMrr),
+      fmtDate(row.renewalDate),
+      fmtMoney(row.expectedArrAtRenewal),
+      fmtMoney(row.lifetimeExpansionEur),
+      fmtPct(row.lifetimeExpansionPct),
+    ];
+    for (const c of cells) {
+      const td = document.createElement('td');
+      td.textContent = c;
+      tr.appendChild(td);
+    }
+    for (const m of currentData.months) {
+      const td = document.createElement('td');
+      td.className = 'num';
+      const v = row.monthlyTotals ? row.monthlyTotals[m] : null;
+      td.textContent = v == null ? '' : fmtMoney(v);
+      tr.appendChild(td);
+    }
+    for (const col of NA_COLUMNS) {
+      const td = document.createElement('td');
+      td.className = 'na';
+      td.textContent = 'N/A — no data source';
+      td.title = 'No real data source via the connected Stripe/ProfitWell APIs.';
+      tr.appendChild(td);
+    }
+    tbody.appendChild(tr);
+  }
+}
+
+async function loadData() {
+  setLoading(true);
+  showError(null);
+  try {
+    const res = await fetch('/api/dashboard-data');
+    const body = await res.json();
+    if (!res.ok) {
+      throw new Error(body.error || `Request failed with status ${res.status}`);
+    }
+    currentData = body;
+    renderKpis(body.companyMetrics);
+    renderHeader(body.months, body.monthLabels);
+    sortState = { key: null, dir: 1 };
+    renderRows();
+    document.getElementById('lastRefreshed').textContent =
+      `Last refreshed: ${new Date(body.generatedAt).toLocaleString()}`;
+  } catch (err) {
+    showError(`Failed to load dashboard data: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+}
+
+document.getElementById('refreshBtn').addEventListener('click', loadData);
+document.getElementById('filterInput').addEventListener('input', renderRows);
+
+loadData();
+</script>
+</body>
+</html>
