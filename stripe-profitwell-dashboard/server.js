@@ -5,7 +5,14 @@ const Stripe = require('stripe');
 
 const PORT = process.env.PORT || 3000;
 const PROFITWELL_TOKEN = process.env.PROFITWELL_TOKEN;
-const PROFITWELL_BASE = 'https://api.profitwell.com/v2/';
+const PROFITWELL_METRICS_BASE = 'https://api.profitwell.com/v2/';
+// ProfitWell's Customers API lives on a different host than the metrics API.
+// Its docs (paddle.com/help and the Apiary reference) returned 403 to every
+// fetch attempt in this session, so this endpoint/shape comes from secondhand
+// search-engine summaries of that documentation, not a directly observed
+// response — verify against a real call and adjust FIELD candidates below if
+// the actual field names differ.
+const PROFITWELL_CUSTOMERS_BASE = 'https://api.profitwell-events.com/v2/customers/';
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 const HUBSPOT_BASE = 'https://api.hubapi.com';
 
@@ -15,31 +22,9 @@ if (!process.env.STRIPE_SECRET_KEY) {
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' });
 
-// Statuses treated as "active/recent" per the spec. Fully-dead subscriptions
-// (canceled, incomplete_expired) are excluded from the customer table.
+// Statuses treated as "active/recent" — fully-dead subscriptions (canceled,
+// incomplete_expired) are excluded when matching a ProfitWell customer to Stripe.
 const RELEVANT_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'incomplete']);
-
-// Stripe tax_id `type` values are prefixed with an ISO-3166 alpha-2 country
-// code for every type except the EU-wide `eu_vat`, which doesn't map to a
-// single country and is skipped.
-function countryFromTaxIds(taxIds) {
-  if (!taxIds || !taxIds.length) return null;
-  for (const t of taxIds) {
-    if (t.type === 'eu_vat') continue;
-    const m = /^([a-z]{2})_/.exec(t.type || '');
-    if (m) return m[1].toUpperCase();
-  }
-  return null;
-}
-
-function resolveCountry(customer, taxIds) {
-  return (
-    customer.address?.country ||
-    customer.shipping?.address?.country ||
-    countryFromTaxIds(taxIds) ||
-    null
-  );
-}
 
 function billingCycleFor(items) {
   let hasFlat = false;
@@ -62,25 +47,8 @@ function billingCycleFor(items) {
   return 'Multi-year';
 }
 
-function paymentTypeFor(collectionMethod) {
-  if (collectionMethod === 'charge_automatically') return 'Automatic';
-  if (collectionMethod === 'send_invoice') return 'Manual';
-  return collectionMethod || 'Unknown';
-}
-
-function monthKey(unixSeconds) {
-  const d = new Date(unixSeconds * 1000);
-  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-}
-
-function monthLabel(key) {
-  const [y, m] = key.split('-').map(Number);
-  const d = new Date(Date.UTC(y, m - 1, 1));
-  return d.toLocaleString('en-US', { month: 'short', timeZone: 'UTC' }) + '-' + String(y).slice(2);
-}
-
-// Batches concurrent async work so we don't fire hundreds of Stripe requests
-// (e.g. tax-id lookups) at once and hit rate limits.
+// Batches concurrent async work so we don't fire hundreds of requests at once
+// and hit rate limits.
 async function mapWithConcurrency(items, limit, fn) {
   const results = new Array(items.length);
   let next = 0;
@@ -94,52 +62,85 @@ async function mapWithConcurrency(items, limit, fn) {
   return results;
 }
 
-// Fetches every paid invoice in the account (auto-paginating) and groups
-// amounts by customer + calendar month, so per-customer monthly MRR history
-// and lifetime-expansion figures come from one paginated list instead of a
-// separate API call per customer.
-async function fetchInvoiceHistory() {
-  const byCustomer = new Map();
-  const monthSet = new Set();
+// ---------- ProfitWell: full customer list (the base of the table) ----------
 
-  for await (const invoice of stripe.invoices.list({ status: 'paid', limit: 100 })) {
-    const customerId = typeof invoice.customer === 'string' ? invoice.customer : invoice.customer?.id;
-    if (!customerId) continue;
-    const ts = invoice.status_transitions?.paid_at || invoice.created;
-    const key = monthKey(ts);
-    monthSet.add(key);
-    if (!byCustomer.has(customerId)) byCustomer.set(customerId, []);
-    byCustomer.get(customerId).push({ ts, monthKey: key, amount: (invoice.amount_paid || 0) / 100 });
+function firstDefined(obj, keys) {
+  for (const k of keys) {
+    if (obj[k] !== undefined && obj[k] !== null) return obj[k];
   }
-
-  for (const list of byCustomer.values()) list.sort((a, b) => a.ts - b.ts);
-
-  return { byCustomer, months: Array.from(monthSet).sort() };
+  return null;
 }
 
-// Sum of positive month-over-month invoice-amount increases across a
-// customer's full paid-invoice history, versus their first invoice amount.
-// This is a derived estimate, not an official Stripe/ProfitWell metric.
-function lifetimeExpansion(invoices) {
-  if (!invoices || invoices.length === 0) return { eur: null, pct: null };
-  const first = invoices[0].amount;
-  let expansion = 0;
-  for (let i = 1; i < invoices.length; i++) {
-    const diff = invoices[i].amount - invoices[i - 1].amount;
-    if (diff > 0) expansion += diff;
+async function fetchProfitwellCustomers() {
+  if (!PROFITWELL_TOKEN) {
+    const err = new Error('PROFITWELL_TOKEN is not configured on the server.');
+    err.statusCode = 500;
+    throw err;
   }
-  const pct = first > 0 ? (expansion / first) * 100 : null;
-  return { eur: expansion, pct };
+
+  const customers = [];
+  const perPage = 100;
+  for (let page = 1; page <= 2000; page++) {
+    const res = await fetch(`${PROFITWELL_CUSTOMERS_BASE}?page=${page}&per_page=${perPage}`, {
+      headers: { Authorization: PROFITWELL_TOKEN },
+    });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      const err = new Error(`ProfitWell Customers API responded ${res.status}: ${body || res.statusText}`);
+      err.statusCode = res.status;
+      throw err;
+    }
+    const json = await res.json();
+    const batch = Array.isArray(json) ? json : Array.isArray(json.data) ? json.data : Array.isArray(json.customers) ? json.customers : null;
+    if (!batch) {
+      const err = new Error('Unexpected response shape from the ProfitWell Customers API (expected an array of customers).');
+      err.statusCode = 502;
+      throw err;
+    }
+    for (const c of batch) {
+      const email = firstDefined(c, ['email', 'customer_email']);
+      const mrr = firstDefined(c, ['mrr', 'recurring_revenue', 'monthly_recurring_revenue']);
+      if (email) customers.push({ email, mrr: mrr != null ? Number(mrr) : null });
+    }
+    if (batch.length < perPage) break;
+  }
+  return customers;
 }
 
-function monthlyTotalsFor(invoices, months) {
-  const totals = {};
-  for (const m of months) totals[m] = null;
-  for (const inv of invoices || []) {
-    totals[inv.monthKey] = (totals[inv.monthKey] || 0) + inv.amount;
+// ---------- Stripe: email -> subscription summary, for the join ----------
+
+async function buildStripeIndexByEmail() {
+  const index = new Map();
+  for await (const sub of stripe.subscriptions.list({
+    status: 'all',
+    limit: 100,
+    expand: ['data.customer', 'data.items.data.price.product'],
+  })) {
+    if (!RELEVANT_STATUSES.has(sub.status)) continue;
+    const email = sub.customer?.email;
+    if (!email) continue;
+
+    const items = sub.items.data;
+    const firstItem = items[0];
+    const price = firstItem?.price;
+    const unitAmount = price?.unit_amount;
+    const mrr = unitAmount != null ? (unitAmount * (firstItem.quantity || 1)) / 100 : null;
+
+    // A customer can have more than one subscription in Stripe; keep the most recent.
+    const existing = index.get(email);
+    if (!existing || sub.created > existing.subscriptionDate) {
+      index.set(email, {
+        mrr,
+        product: price?.product?.name || 'Unknown product',
+        subscriptionSummary: `${billingCycleFor(items)} · ${sub.status}`,
+        subscriptionDate: sub.created,
+      });
+    }
   }
-  return totals;
+  return index;
 }
+
+// ---------- HubSpot: email -> contact owner ----------
 
 async function hubspotFetch(path, options = {}) {
   const res = await fetch(`${HUBSPOT_BASE}${path}`, {
@@ -171,18 +172,8 @@ async function findContactByEmail(email) {
   return json.results?.[0] || null;
 }
 
-async function findPrimaryCompanyId(contactId) {
-  const json = await hubspotFetch(`/crm/v3/objects/contacts/${contactId}/associations/companies`);
-  return json.results?.[0]?.id || null;
-}
-
-async function getCompanyOwnerId(companyId) {
-  const json = await hubspotFetch(`/crm/v3/objects/companies/${companyId}?properties=hubspot_owner_id`);
-  return json.properties?.hubspot_owner_id || null;
-}
-
 // Owner id -> display name, cached per refresh cycle so the same owner
-// (frequently the same person owns many contacts/companies) isn't re-fetched.
+// (frequently the same person owns many contacts) isn't re-fetched.
 async function getOwnerName(ownerId, cache) {
   if (!ownerId) return null;
   if (cache.has(ownerId)) return cache.get(ownerId);
@@ -192,41 +183,16 @@ async function getOwnerName(ownerId, cache) {
   return name;
 }
 
-// Contact owner and company owner are looked up and reported separately —
-// HubSpot's "owner" is per-record, and a contact's owner is frequently a
-// different person than the associated company's owner.
-async function resolveHubspotOwners(email, ownerNameCache) {
-  const contact = await findContactByEmail(email);
-  if (!contact) {
-    return { contactOwner: 'Not found in HubSpot', companyOwner: 'Not found in HubSpot' };
-  }
-
-  const contactOwnerId = contact.properties?.hubspot_owner_id || null;
-  const contactOwner = contactOwnerId ? await getOwnerName(contactOwnerId, ownerNameCache) : 'Unassigned';
-
-  const companyId = await findPrimaryCompanyId(contact.id);
-  let companyOwner = 'Unassigned';
-  if (companyId) {
-    const companyOwnerId = await getCompanyOwnerId(companyId);
-    companyOwner = companyOwnerId ? await getOwnerName(companyOwnerId, ownerNameCache) : 'Unassigned';
-  }
-
-  return { contactOwner, companyOwner };
-}
-
-// Resolves contact/company owners for every unique customer email in one
-// batch, deduped and rate-limited, so customers who appear more than once
-// (multiple subscriptions) only trigger one HubSpot lookup each. If the
-// token itself is bad, every lookup would fail the same way, so the first
-// 401/403 short-circuits the rest instead of repeating the same failure.
-async function enrichWithHubSpot(emails) {
-  const resultByEmail = new Map();
+// Resolves the contact owner for every unique email in one batch, deduped and
+// rate-limited. If the token itself is bad, every lookup fails the same way,
+// so the first 401/403 short-circuits the rest instead of repeating the
+// failure for every remaining customer.
+async function resolveContactOwners(emails) {
+  const byEmail = new Map();
 
   if (!HUBSPOT_TOKEN) {
-    for (const email of emails) {
-      resultByEmail.set(email, { contactOwner: 'HubSpot not configured', companyOwner: 'HubSpot not configured' });
-    }
-    return resultByEmail;
+    for (const email of emails) byEmail.set(email, 'HubSpot not configured');
+    return byEmail;
   }
 
   const ownerNameCache = new Map();
@@ -234,97 +200,27 @@ async function enrichWithHubSpot(emails) {
 
   await mapWithConcurrency(emails, 5, async (email) => {
     if (authFailed) {
-      resultByEmail.set(email, { contactOwner: 'HubSpot authentication error', companyOwner: 'HubSpot authentication error' });
+      byEmail.set(email, 'HubSpot authentication error');
       return;
     }
     try {
-      resultByEmail.set(email, await resolveHubspotOwners(email, ownerNameCache));
+      const contact = await findContactByEmail(email);
+      if (!contact) {
+        byEmail.set(email, null); // no matching HubSpot contact — leave unpopulated
+        return;
+      }
+      const ownerId = contact.properties?.hubspot_owner_id || null;
+      byEmail.set(email, ownerId ? await getOwnerName(ownerId, ownerNameCache) : 'Unassigned');
     } catch (err) {
       if (err.statusCode === 401 || err.statusCode === 403) authFailed = true;
-      resultByEmail.set(email, {
-        contactOwner: authFailed ? 'HubSpot authentication error' : 'HubSpot lookup failed',
-        companyOwner: authFailed ? 'HubSpot authentication error' : 'HubSpot lookup failed',
-      });
+      byEmail.set(email, authFailed ? 'HubSpot authentication error' : 'HubSpot lookup failed');
     }
   });
 
-  return resultByEmail;
+  return byEmail;
 }
 
-async function buildCustomerRows() {
-  const { byCustomer, months } = await fetchInvoiceHistory();
-
-  const subscriptions = [];
-  for await (const sub of stripe.subscriptions.list({
-    status: 'all',
-    limit: 100,
-    expand: ['data.customer', 'data.items.data.price.product'],
-  })) {
-    if (RELEVANT_STATUSES.has(sub.status)) subscriptions.push(sub);
-  }
-
-  // customer.tax_ids isn't included on the subscription's expanded customer,
-  // so only fetch it (per customer, deduped) when address/shipping are both
-  // missing and we actually need the fallback.
-  const needsTaxIds = subscriptions.filter(
-    (sub) => !sub.customer?.address?.country && !sub.customer?.shipping?.address?.country
-  );
-  const uniqueCustomerIds = Array.from(new Set(needsTaxIds.map((s) => s.customer.id)));
-  const taxIdMap = new Map();
-  await mapWithConcurrency(uniqueCustomerIds, 5, async (customerId) => {
-    try {
-      const list = await stripe.customers.listTaxIds(customerId, { limit: 10 });
-      taxIdMap.set(customerId, list.data);
-    } catch (e) {
-      taxIdMap.set(customerId, []);
-    }
-  });
-
-  const uniqueEmails = Array.from(
-    new Set(subscriptions.map((s) => s.customer.email).filter((e) => e))
-  );
-  const hubspotByEmail = await enrichWithHubSpot(uniqueEmails);
-
-  const rows = subscriptions.map((sub) => {
-    const customer = sub.customer;
-    const items = sub.items.data;
-    const firstItem = items[0];
-    const price = firstItem?.price;
-    const product = price?.product;
-
-    const country = resolveCountry(customer, taxIdMap.get(customer.id));
-    const invoices = byCustomer.get(customer.id) || [];
-    const expansion = lifetimeExpansion(invoices);
-    const monthlyTotals = monthlyTotalsFor(invoices, months);
-
-    const unitAmount = price?.unit_amount;
-    const currentMrr = unitAmount != null ? (unitAmount * (firstItem.quantity || 1)) / 100 : null;
-    const hubspot = (customer.email && hubspotByEmail.get(customer.email)) || {
-      contactOwner: 'Not provided',
-      companyOwner: 'Not provided',
-    };
-
-    return {
-      customerId: customer.id,
-      email: customer.email || 'Not provided',
-      subscriptionDate: sub.created,
-      product: product?.name || 'Unknown product',
-      billingCycle: billingCycleFor(items),
-      paymentType: paymentTypeFor(sub.collection_method),
-      country: country || 'Not provided',
-      contactOwner: hubspot.contactOwner,
-      companyOwner: hubspot.companyOwner,
-      currentMrr,
-      renewalDate: sub.current_period_end,
-      expectedArrAtRenewal: currentMrr != null ? currentMrr * 12 : null,
-      lifetimeExpansionEur: expansion.eur,
-      lifetimeExpansionPct: expansion.pct,
-      monthlyTotals,
-    };
-  });
-
-  return { rows, months };
-}
+// ---------- ProfitWell company-wide monthly metrics (summary panel) ----------
 
 // The ProfitWell v2 response shape (a `data` object keyed by metric-trend
 // name, each an array of {date, value} points) is documented, but this
@@ -363,7 +259,7 @@ async function fetchProfitWellMetrics() {
     return { error: 'PROFITWELL_TOKEN is not configured on the server.' };
   }
 
-  const res = await fetch(`${PROFITWELL_BASE}metrics/monthly/`, {
+  const res = await fetch(`${PROFITWELL_METRICS_BASE}metrics/monthly/`, {
     headers: { Authorization: PROFITWELL_TOKEN },
   });
 
@@ -396,18 +292,40 @@ async function fetchProfitWellMetrics() {
   };
 }
 
+// ---------- assemble: ProfitWell customers as the base, joined by email ----------
+
+async function buildCustomerRows() {
+  const pwCustomers = await fetchProfitwellCustomers();
+  const emails = pwCustomers.map((c) => c.email);
+
+  const [stripeIndex, hubspotByEmail] = await Promise.all([
+    buildStripeIndexByEmail(),
+    resolveContactOwners(emails),
+  ]);
+
+  return pwCustomers.map((c) => {
+    const s = stripeIndex.get(c.email);
+    return {
+      email: c.email,
+      profitwellMrr: c.mrr,
+      stripeMrr: s ? s.mrr : null,
+      stripeProduct: s ? s.product : null,
+      stripeSubscription: s ? s.subscriptionSummary : null,
+      hubspotContactOwner: hubspotByEmail.get(c.email) ?? null,
+    };
+  });
+}
+
 const app = express();
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/dashboard-data', async (req, res) => {
   try {
-    const [customerData, profitwell] = await Promise.all([buildCustomerRows(), fetchProfitWellMetrics()]);
+    const [customers, companyMetrics] = await Promise.all([buildCustomerRows(), fetchProfitWellMetrics()]);
     res.json({
       generatedAt: new Date().toISOString(),
-      companyMetrics: profitwell,
-      months: customerData.months,
-      monthLabels: Object.fromEntries(customerData.months.map((m) => [m, monthLabel(m)])),
-      customers: customerData.rows,
+      companyMetrics,
+      customers,
     });
   } catch (err) {
     console.error(err);
@@ -417,5 +335,5 @@ app.get('/api/dashboard-data', async (req, res) => {
 });
 
 app.listen(PORT, () => {
-  console.log(`Stripe/ProfitWell dashboard listening on http://localhost:${PORT}`);
+  console.log(`Stripe/ProfitWell/HubSpot dashboard listening on http://localhost:${PORT}`);
 });

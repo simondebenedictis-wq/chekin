@@ -13,9 +13,10 @@
     --font:'Inter',system-ui,sans-serif;--mono:'SF Mono','Fira Code',monospace;
   }
   body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;padding:24px}
-  .wrap{max-width:1600px;margin:0 auto}
+  .wrap{max-width:1400px;margin:0 auto}
   .header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px;margin-bottom:20px}
   h1{font-size:20px;font-weight:800}
+  .subtitle{font-size:12px;color:var(--muted);margin-top:4px}
   .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
   .refresh-row{display:flex;align-items:center;gap:10px}
   #lastRefreshed{font-size:12px;color:var(--muted)}
@@ -62,7 +63,10 @@
 <body>
 <div class="wrap">
   <div class="header">
-    <h1>Customer / Subscription Dashboard</h1>
+    <div>
+      <h1>Customer Dashboard</h1>
+      <div class="subtitle">Base list is ProfitWell customers, joined with Stripe and HubSpot by email.</div>
+    </div>
     <div class="header-right">
       <div class="refresh-row">
         <span id="lastRefreshed">Last refreshed: never</span>
@@ -92,26 +96,12 @@
   </div>
 
   <div class="footnote">
-    "Lifetime Expansion (estimated)" and "Expected ARR at Renewal (estimated)" are calculated from Stripe invoice
-    history, not official Stripe/ProfitWell metrics. Monthly MRR columns come from paid Stripe invoices grouped by
-    month ("from invoice history") — a blank cell means no paid invoice that month, not zero. "Contact Owner" and
-    "Company Owner" are looked up separately in HubSpot and are often different people — a contact's owner is not
-    assumed to be the same as its associated company's owner. Columns marked "N/A — no data source" (next scheduled
-    expansion/downgrade dates, forecasted MRR, renewal probability) have no real data source via the connected
-    Stripe/ProfitWell/HubSpot APIs and are never estimated or fabricated.
+    Every row is a ProfitWell customer. Stripe and HubSpot fields are only populated when that ProfitWell email
+    matches a Stripe customer / HubSpot contact — otherwise the cell is left blank, never guessed.
   </div>
 </div>
 
 <script>
-const NA_COLUMNS = [
-  { key: 'nextExpansion', label: 'Next Scheduled Expansion Date' },
-  { key: 'nextDowngrade', label: 'Next Scheduled Downgrade Date' },
-  { key: 'forecast30', label: 'Forecasted MRR (30d)' },
-  { key: 'forecast60', label: 'Forecasted MRR (60d)' },
-  { key: 'forecast90', label: 'Forecasted MRR (90d)' },
-  { key: 'renewalProb', label: 'Renewal Probability' },
-];
-
 const KPI_DEFS = [
   ['startingMrr', 'Starting MRR'],
   ['previousMonthMrr', 'Previous Month MRR'],
@@ -123,20 +113,20 @@ const KPI_DEFS = [
   ['reactivatedMrr', 'Reactivated MRR'],
 ];
 
+const COLUMNS = [
+  { key: 'email', label: 'Email' },
+  { key: 'profitwellMrr', label: 'ProfitWell MRR', numeric: true },
+  { key: 'stripeMrr', label: 'Stripe MRR', numeric: true },
+  { key: 'stripeProduct', label: 'Stripe Product' },
+  { key: 'stripeSubscription', label: 'Stripe Subscription' },
+  { key: 'hubspotContactOwner', label: 'HubSpot Contact Owner' },
+];
+
 let currentData = null;
 let sortState = { key: null, dir: 1 };
 
-const PLACEHOLDER_VALUES = new Set([
-  'Not provided', 'Unassigned', 'Not found in HubSpot',
-  'HubSpot not configured', 'HubSpot authentication error', 'HubSpot lookup failed',
-]);
-
 const fmtMoney = (v) => (v == null || Number.isNaN(v)) ? '' :
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
-const fmtPct = (v) => (v == null || Number.isNaN(v)) ? '' : `${v.toFixed(1)}%`;
-const fmtDate = (unix) => unix == null ? '' : new Date(unix * 1000).toLocaleDateString('en-GB', {
-  year: 'numeric', month: 'short', day: 'numeric',
-});
 
 function setLoading(loading) {
   const btn = document.getElementById('refreshBtn');
@@ -158,9 +148,8 @@ function renderKpis(metrics) {
   if (!metrics || metrics.error) {
     const div = document.createElement('div');
     div.className = 'kpi';
-    div.innerHTML = `<div class="kpi-label">ProfitWell</div><div class="kpi-value na">${
-      metrics && metrics.error ? metrics.error : 'Unavailable'
-    }</div>`;
+    div.innerHTML = `<div class="kpi-label">ProfitWell</div><div class="kpi-value na"></div>`;
+    div.querySelector('.kpi-value').textContent = (metrics && metrics.error) ? metrics.error : 'Unavailable';
     row.appendChild(div);
     return;
   }
@@ -169,39 +158,18 @@ function renderKpis(metrics) {
     const div = document.createElement('div');
     div.className = 'kpi';
     const display = val == null ? 'Not found in ProfitWell response' : fmtMoney(val);
-    div.innerHTML = `<div class="kpi-label">${label}</div><div class="kpi-value ${val == null ? 'na' : ''}">${display}</div>`;
+    div.innerHTML = `<div class="kpi-label">${label}</div><div class="kpi-value ${val == null ? 'na' : ''}"></div>`;
+    div.querySelector('.kpi-value').textContent = display;
     row.appendChild(div);
   }
 }
 
-function baseColumns() {
-  return [
-    { key: 'email', label: 'Customer/Email' },
-    { key: 'subscriptionDate', label: 'Subscription Date' },
-    { key: 'product', label: 'Product' },
-    { key: 'billingCycle', label: 'Billing Cycle' },
-    { key: 'paymentType', label: 'Payment Type' },
-    { key: 'country', label: 'Location/Country' },
-    { key: 'contactOwner', label: 'Contact Owner (HubSpot)' },
-    { key: 'companyOwner', label: 'Company Owner (HubSpot)' },
-    { key: 'currentMrr', label: 'Current MRR (customer)' },
-    { key: 'renewalDate', label: 'Renewal Date' },
-    { key: 'expectedArrAtRenewal', label: 'Expected ARR at Renewal (estimated)' },
-    { key: 'lifetimeExpansionEur', label: 'Lifetime Expansion € (estimated)' },
-    { key: 'lifetimeExpansionPct', label: 'Lifetime Expansion % (estimated)' },
-  ];
-}
-
-function renderHeader(months, monthLabels) {
+function renderHeader() {
   const headerRow = document.getElementById('headerRow');
   headerRow.innerHTML = '';
-  const cols = [...baseColumns(), ...months.map((m) => ({ key: `month:${m}`, label: `${monthLabels[m]} (from invoice history)` })), ...NA_COLUMNS];
-  for (const col of cols) {
+  for (const col of COLUMNS) {
     const th = document.createElement('th');
     th.textContent = col.label;
-    th.title = NA_COLUMNS.some((c) => c.key === col.key)
-      ? 'No real data source via the connected Stripe/ProfitWell APIs — not estimated or fabricated.'
-      : '';
     th.addEventListener('click', () => {
       sortState = { key: col.key, dir: sortState.key === col.key ? -sortState.dir : 1 };
       renderRows();
@@ -210,25 +178,19 @@ function renderHeader(months, monthLabels) {
   }
 }
 
-function cellValue(row, key) {
-  if (key.startsWith('month:')) {
-    const m = key.slice(6);
-    return row.monthlyTotals ? row.monthlyTotals[m] : null;
-  }
-  return row[key];
-}
-
 function renderRows() {
   if (!currentData) return;
   const filter = document.getElementById('filterInput').value.trim().toLowerCase();
   let rows = currentData.customers.filter((r) =>
-    !filter || r.email.toLowerCase().includes(filter) || r.product.toLowerCase().includes(filter)
+    !filter ||
+    r.email.toLowerCase().includes(filter) ||
+    (r.stripeProduct || '').toLowerCase().includes(filter)
   );
 
   if (sortState.key) {
     rows = [...rows].sort((a, b) => {
-      const av = cellValue(a, sortState.key);
-      const bv = cellValue(b, sortState.key);
+      const av = a[sortState.key];
+      const bv = b[sortState.key];
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
@@ -238,45 +200,22 @@ function renderRows() {
     });
   }
 
-  document.getElementById('rowCount').textContent = `${rows.length} subscription${rows.length === 1 ? '' : 's'}`;
+  document.getElementById('rowCount').textContent = `${rows.length} customer${rows.length === 1 ? '' : 's'}`;
 
   const tbody = document.getElementById('tableBody');
   tbody.innerHTML = '';
   for (const row of rows) {
     const tr = document.createElement('tr');
-    const cells = [
-      row.email,
-      fmtDate(row.subscriptionDate),
-      row.product,
-      row.billingCycle,
-      row.paymentType,
-      row.country,
-      row.contactOwner,
-      row.companyOwner,
-      fmtMoney(row.currentMrr),
-      fmtDate(row.renewalDate),
-      fmtMoney(row.expectedArrAtRenewal),
-      fmtMoney(row.lifetimeExpansionEur),
-      fmtPct(row.lifetimeExpansionPct),
-    ];
-    for (const c of cells) {
+    for (const col of COLUMNS) {
       const td = document.createElement('td');
-      td.textContent = c;
-      if (PLACEHOLDER_VALUES.has(c)) td.className = 'na';
-      tr.appendChild(td);
-    }
-    for (const m of currentData.months) {
-      const td = document.createElement('td');
-      td.className = 'num';
-      const v = row.monthlyTotals ? row.monthlyTotals[m] : null;
-      td.textContent = v == null ? '' : fmtMoney(v);
-      tr.appendChild(td);
-    }
-    for (const col of NA_COLUMNS) {
-      const td = document.createElement('td');
-      td.className = 'na';
-      td.textContent = 'N/A — no data source';
-      td.title = 'No real data source via the connected Stripe/ProfitWell APIs.';
+      const raw = row[col.key];
+      if (col.key === 'profitwellMrr' || col.key === 'stripeMrr') {
+        td.className = 'num';
+        td.textContent = fmtMoney(raw);
+      } else {
+        td.textContent = raw ?? '';
+        if (raw == null) td.className = 'na';
+      }
       tr.appendChild(td);
     }
     tbody.appendChild(tr);
@@ -294,7 +233,7 @@ async function loadData() {
     }
     currentData = body;
     renderKpis(body.companyMetrics);
-    renderHeader(body.months, body.monthLabels);
+    renderHeader();
     sortState = { key: null, dir: 1 };
     renderRows();
     document.getElementById('lastRefreshed').textContent =
