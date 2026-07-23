@@ -57,19 +57,18 @@ spinner, error banner, simple client-side sort/filter.
 
 ## Known limitations / things to verify before relying on this
 
-- **The ProfitWell Customers API endpoint/shape is unverified.** This
-  session's network policy blocks outbound calls to both
-  `api.profitwell.com` and `api.profitwell-events.com`, and the official docs
-  (paddle.com/help and the Apiary reference) returned 403 to every fetch
-  attempt — so `PROFITWELL_CUSTOMERS_BASE` in `server.js`
-  (`https://api.profitwell-events.com/v2/customers/`) and its pagination
-  (`page`/`per_page` query params) and field names (`email`, `mrr`) are built
-  from secondhand search-engine summaries of that documentation, not a
-  directly observed response. **Run this once against your real ProfitWell
-  account before trusting it.** If it errors or returns no rows, the error
-  message returned by `/api/dashboard-data` will include the real HTTP
-  status and response body from ProfitWell — send that back and the base
-  URL/pagination/field names can be corrected in one pass.
+- **The ProfitWell Customers API request URL is confirmed; the response
+  body's field names are not.** The endpoint, path (no `/v2/`, unlike the
+  metrics API), and query params (`date_field`, `start_date`, `end_date`,
+  `page`, `per_page`, `direction`) were confirmed against ProfitWell's own
+  documented example request. This session's network policy still blocks
+  actually calling `api.profitwell-events.com` from here, so the *response*
+  field names (`email`, `mrr` in `server.js`'s `firstDefined` candidates)
+  haven't been checked against a live payload. **Run this once against your
+  real ProfitWell account before trusting it.** If a customer's email or MRR
+  comes through as blank/null when you know it shouldn't be, the response
+  body has different field names than guessed — send me one raw customer
+  object from the response and I'll fix `firstDefined`'s candidate list.
 - **ProfitWell's monthly-metrics field names weren't verified either**, for
   the same network-access reason. `METRIC_ALIASES` in `server.js` tries
   several known aliases per concept (e.g. `recurring_revenue`, `mrr`) and

@@ -6,13 +6,15 @@ const Stripe = require('stripe');
 const PORT = process.env.PORT || 3000;
 const PROFITWELL_TOKEN = process.env.PROFITWELL_TOKEN;
 const PROFITWELL_METRICS_BASE = 'https://api.profitwell.com/v2/';
-// ProfitWell's Customers API lives on a different host than the metrics API.
-// Its docs (paddle.com/help and the Apiary reference) returned 403 to every
-// fetch attempt in this session, so this endpoint/shape comes from secondhand
-// search-engine summaries of that documentation, not a directly observed
-// response — verify against a real call and adjust FIELD candidates below if
-// the actual field names differ.
-const PROFITWELL_CUSTOMERS_BASE = 'https://api.profitwell-events.com/v2/customers/';
+// ProfitWell's Customers API lives on a different host than the metrics API,
+// and (unlike the metrics API) has no /v2/ path segment — confirmed from the
+// docs' own example request:
+//   https://api.profitwell-events.com/customers/?date_field=updated_on&start_date=...&end_date=...&page=1&per_page=10&direction=asc
+// The response body's exact field names are still unconfirmed (this
+// session's network policy blocks reaching this host directly), so
+// `firstDefined` below tries a couple of candidates per field and the error
+// path surfaces ProfitWell's real response if the shape is still off.
+const PROFITWELL_CUSTOMERS_BASE = 'https://api.profitwell-events.com/customers/';
 const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 const HUBSPOT_BASE = 'https://api.hubapi.com';
 
@@ -71,6 +73,13 @@ function firstDefined(obj, keys) {
   return null;
 }
 
+// ProfitWell's date params use "YYYY-MM-DD HH:MM:SS" (space-separated, UTC),
+// per the docs' example — not ISO 8601.
+function formatProfitwellDate(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())} ${pad(date.getUTCHours())}:${pad(date.getUTCMinutes())}:${pad(date.getUTCSeconds())}`;
+}
+
 async function fetchProfitwellCustomers() {
   if (!PROFITWELL_TOKEN) {
     const err = new Error('PROFITWELL_TOKEN is not configured on the server.');
@@ -80,8 +89,22 @@ async function fetchProfitwellCustomers() {
 
   const customers = [];
   const perPage = 100;
+  // date_field/start_date/end_date appear in every documented example, so a
+  // wide fixed range (rather than omitting them) is used to fetch the full
+  // customer list regardless of when each was last updated.
+  const startDate = '2000-01-01 00:00:00';
+  const endDate = formatProfitwellDate(new Date());
+
   for (let page = 1; page <= 2000; page++) {
-    const res = await fetch(`${PROFITWELL_CUSTOMERS_BASE}?page=${page}&per_page=${perPage}`, {
+    const params = new URLSearchParams({
+      date_field: 'updated_on',
+      start_date: startDate,
+      end_date: endDate,
+      page: String(page),
+      per_page: String(perPage),
+      direction: 'asc',
+    });
+    const res = await fetch(`${PROFITWELL_CUSTOMERS_BASE}?${params.toString()}`, {
       headers: { Authorization: PROFITWELL_TOKEN },
     });
     if (!res.ok) {
