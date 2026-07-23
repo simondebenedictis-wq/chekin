@@ -132,12 +132,17 @@ async function fetchProfitwellCustomers() {
 
 // ---------- Stripe: email -> subscription summary, for the join ----------
 
+// Stripe rejects expand paths deeper than 4 levels, and
+// "data.items.data.price.product" is 5 — confirmed live against this
+// account's Stripe API (400: "You cannot expand more than 4 levels").
+// So `price.product` here is just an id; product names are resolved in a
+// second pass below.
 async function buildStripeIndexByEmail() {
   const index = new Map();
   for await (const sub of stripe.subscriptions.list({
     status: 'all',
     limit: 100,
-    expand: ['data.customer', 'data.items.data.price.product'],
+    expand: ['data.customer', 'data.items.data.price'],
   })) {
     if (!RELEVANT_STATUSES.has(sub.status)) continue;
     const email = sub.customer?.email;
@@ -147,6 +152,10 @@ async function buildStripeIndexByEmail() {
     const firstItem = items[0];
     const price = firstItem?.price;
     const unitAmount = price?.unit_amount;
+    // unit_amount is null for tiered/graduated pricing (confirmed live on
+    // several of this account's real subscriptions) and for metered prices —
+    // left blank rather than guessed, since there's no single "per unit"
+    // amount to multiply by quantity in those billing schemes.
     const mrr = unitAmount != null ? (unitAmount * (firstItem.quantity || 1)) / 100 : null;
 
     // A customer can have more than one subscription in Stripe; keep the most recent.
@@ -154,12 +163,27 @@ async function buildStripeIndexByEmail() {
     if (!existing || sub.created > existing.subscriptionDate) {
       index.set(email, {
         mrr,
-        product: price?.product?.name || 'Unknown product',
+        productId: typeof price?.product === 'string' ? price.product : price?.product?.id || null,
         subscriptionSummary: `${billingCycleFor(items)} · ${sub.status}`,
         subscriptionDate: sub.created,
       });
     }
   }
+
+  const uniqueProductIds = Array.from(new Set(Array.from(index.values()).map((v) => v.productId).filter(Boolean)));
+  const productNames = new Map();
+  // GetProducts supports a batch `ids` filter (confirmed against this
+  // account's Stripe API), so all product names come back in chunks of up
+  // to 100 instead of one request per product.
+  for (let i = 0; i < uniqueProductIds.length; i += 100) {
+    const chunk = uniqueProductIds.slice(i, i + 100);
+    const { data: products } = await stripe.products.list({ ids: chunk, limit: 100 });
+    for (const product of products) productNames.set(product.id, product.name || 'Unknown product');
+  }
+  for (const v of index.values()) {
+    v.product = v.productId ? productNames.get(v.productId) || 'Unknown product' : 'Unknown product';
+  }
+
   return index;
 }
 

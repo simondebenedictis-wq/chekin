@@ -42,7 +42,9 @@ left blank, never guessed or defaulted to zero.
 2. **Builds a Stripe email → subscription index**: lists all Stripe
    subscriptions (auto-paginated, all pages) with status
    `active`/`trialing`/`past_due`/`unpaid`/`incomplete`, expanding customer
-   and product, keeping the most recent subscription per email.
+   and price, keeping the most recent subscription per email. Product names
+   are resolved in a separate batched call (`GetProducts` with an `ids`
+   filter) rather than an `expand` — see the verified-live note below for why.
 3. **Resolves a HubSpot contact owner per unique email**
    (`POST /crm/v3/objects/contacts/search` filtering on email, reading
    `hubspot_owner_id`, then `GET /crm/v3/owners/{id}` for the display name).
@@ -54,6 +56,26 @@ left blank, never guessed or defaulted to zero.
 
 `public/index.html` — single-file frontend: table, refresh button, loading
 spinner, error banner, simple client-side sort/filter.
+
+## Verified live against this Stripe account this session
+
+Using the Stripe connector available in this session, two real bugs were
+caught and fixed before they'd have hit you at runtime:
+
+- **`expand: ['data.customer', 'data.items.data.price.product']` 400s.**
+  Stripe rejects expand paths deeper than 4 levels; that one is 5
+  (`items.data.price.product`). Fixed by expanding only
+  `data.items.data.price` and resolving product names separately via
+  `GetProducts`'s batch `ids` filter (also confirmed live, returns real
+  product names in one call for up to 100 ids at a time).
+- **`price.unit_amount` is `null` for tiered/graduated pricing** — confirmed
+  on real subscriptions in this account (`billing_scheme: "tiered"`). The
+  "Stripe MRR" formula (`unit_amount * quantity`) can't produce a number for
+  those, so it's left blank rather than showing 0 or a wrong figure. If most
+  of your subscriptions use tiered pricing, expect a lot of blank Stripe MRR
+  cells — that's accurate given the current formula, not a bug, but let me
+  know if you'd rather I compute it a different way (e.g. from the price's
+  `tiers` or from the upcoming-invoice preview).
 
 ## Known limitations / things to verify before relying on this
 
