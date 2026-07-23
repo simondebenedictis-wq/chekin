@@ -6,6 +6,8 @@ const Stripe = require('stripe');
 const PORT = process.env.PORT || 3000;
 const PROFITWELL_TOKEN = process.env.PROFITWELL_TOKEN;
 const PROFITWELL_BASE = 'https://api.profitwell.com/v2/';
+const HUBSPOT_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
+const HUBSPOT_BASE = 'https://api.hubapi.com';
 
 if (!process.env.STRIPE_SECRET_KEY) {
   console.error('STRIPE_SECRET_KEY is not set. Copy .env.example to .env and fill it in.');
@@ -139,6 +141,116 @@ function monthlyTotalsFor(invoices, months) {
   return totals;
 }
 
+async function hubspotFetch(path, options = {}) {
+  const res = await fetch(`${HUBSPOT_BASE}${path}`, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${HUBSPOT_TOKEN}`,
+      'Content-Type': 'application/json',
+      ...(options.headers || {}),
+    },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    const err = new Error(`HubSpot API responded ${res.status}${body ? `: ${body}` : ''}`);
+    err.statusCode = res.status;
+    throw err;
+  }
+  return res.status === 204 ? null : res.json();
+}
+
+async function findContactByEmail(email) {
+  const json = await hubspotFetch('/crm/v3/objects/contacts/search', {
+    method: 'POST',
+    body: JSON.stringify({
+      filterGroups: [{ filters: [{ propertyName: 'email', operator: 'EQ', value: email }] }],
+      properties: ['hubspot_owner_id'],
+      limit: 1,
+    }),
+  });
+  return json.results?.[0] || null;
+}
+
+async function findPrimaryCompanyId(contactId) {
+  const json = await hubspotFetch(`/crm/v3/objects/contacts/${contactId}/associations/companies`);
+  return json.results?.[0]?.id || null;
+}
+
+async function getCompanyOwnerId(companyId) {
+  const json = await hubspotFetch(`/crm/v3/objects/companies/${companyId}?properties=hubspot_owner_id`);
+  return json.properties?.hubspot_owner_id || null;
+}
+
+// Owner id -> display name, cached per refresh cycle so the same owner
+// (frequently the same person owns many contacts/companies) isn't re-fetched.
+async function getOwnerName(ownerId, cache) {
+  if (!ownerId) return null;
+  if (cache.has(ownerId)) return cache.get(ownerId);
+  const json = await hubspotFetch(`/crm/v3/owners/${ownerId}`);
+  const name = [json.firstName, json.lastName].filter(Boolean).join(' ') || json.email || `Owner ${ownerId}`;
+  cache.set(ownerId, name);
+  return name;
+}
+
+// Contact owner and company owner are looked up and reported separately —
+// HubSpot's "owner" is per-record, and a contact's owner is frequently a
+// different person than the associated company's owner.
+async function resolveHubspotOwners(email, ownerNameCache) {
+  const contact = await findContactByEmail(email);
+  if (!contact) {
+    return { contactOwner: 'Not found in HubSpot', companyOwner: 'Not found in HubSpot' };
+  }
+
+  const contactOwnerId = contact.properties?.hubspot_owner_id || null;
+  const contactOwner = contactOwnerId ? await getOwnerName(contactOwnerId, ownerNameCache) : 'Unassigned';
+
+  const companyId = await findPrimaryCompanyId(contact.id);
+  let companyOwner = 'Unassigned';
+  if (companyId) {
+    const companyOwnerId = await getCompanyOwnerId(companyId);
+    companyOwner = companyOwnerId ? await getOwnerName(companyOwnerId, ownerNameCache) : 'Unassigned';
+  }
+
+  return { contactOwner, companyOwner };
+}
+
+// Resolves contact/company owners for every unique customer email in one
+// batch, deduped and rate-limited, so customers who appear more than once
+// (multiple subscriptions) only trigger one HubSpot lookup each. If the
+// token itself is bad, every lookup would fail the same way, so the first
+// 401/403 short-circuits the rest instead of repeating the same failure.
+async function enrichWithHubSpot(emails) {
+  const resultByEmail = new Map();
+
+  if (!HUBSPOT_TOKEN) {
+    for (const email of emails) {
+      resultByEmail.set(email, { contactOwner: 'HubSpot not configured', companyOwner: 'HubSpot not configured' });
+    }
+    return resultByEmail;
+  }
+
+  const ownerNameCache = new Map();
+  let authFailed = false;
+
+  await mapWithConcurrency(emails, 5, async (email) => {
+    if (authFailed) {
+      resultByEmail.set(email, { contactOwner: 'HubSpot authentication error', companyOwner: 'HubSpot authentication error' });
+      return;
+    }
+    try {
+      resultByEmail.set(email, await resolveHubspotOwners(email, ownerNameCache));
+    } catch (err) {
+      if (err.statusCode === 401 || err.statusCode === 403) authFailed = true;
+      resultByEmail.set(email, {
+        contactOwner: authFailed ? 'HubSpot authentication error' : 'HubSpot lookup failed',
+        companyOwner: authFailed ? 'HubSpot authentication error' : 'HubSpot lookup failed',
+      });
+    }
+  });
+
+  return resultByEmail;
+}
+
 async function buildCustomerRows() {
   const { byCustomer, months } = await fetchInvoiceHistory();
 
@@ -168,6 +280,11 @@ async function buildCustomerRows() {
     }
   });
 
+  const uniqueEmails = Array.from(
+    new Set(subscriptions.map((s) => s.customer.email).filter((e) => e))
+  );
+  const hubspotByEmail = await enrichWithHubSpot(uniqueEmails);
+
   const rows = subscriptions.map((sub) => {
     const customer = sub.customer;
     const items = sub.items.data;
@@ -182,6 +299,10 @@ async function buildCustomerRows() {
 
     const unitAmount = price?.unit_amount;
     const currentMrr = unitAmount != null ? (unitAmount * (firstItem.quantity || 1)) / 100 : null;
+    const hubspot = (customer.email && hubspotByEmail.get(customer.email)) || {
+      contactOwner: 'Not provided',
+      companyOwner: 'Not provided',
+    };
 
     return {
       customerId: customer.id,
@@ -191,6 +312,8 @@ async function buildCustomerRows() {
       billingCycle: billingCycleFor(items),
       paymentType: paymentTypeFor(sub.collection_method),
       country: country || 'Not provided',
+      contactOwner: hubspot.contactOwner,
+      companyOwner: hubspot.companyOwner,
       currentMrr,
       renewalDate: sub.current_period_end,
       expectedArrAtRenewal: currentMrr != null ? currentMrr * 12 : null,

@@ -94,9 +94,11 @@
   <div class="footnote">
     "Lifetime Expansion (estimated)" and "Expected ARR at Renewal (estimated)" are calculated from Stripe invoice
     history, not official Stripe/ProfitWell metrics. Monthly MRR columns come from paid Stripe invoices grouped by
-    month ("from invoice history") — a blank cell means no paid invoice that month, not zero. Columns marked
-    "N/A — no data source" (next scheduled expansion/downgrade dates, forecasted MRR, renewal probability) have no
-    real data source via the connected Stripe/ProfitWell APIs and are never estimated or fabricated.
+    month ("from invoice history") — a blank cell means no paid invoice that month, not zero. "Contact Owner" and
+    "Company Owner" are looked up separately in HubSpot and are often different people — a contact's owner is not
+    assumed to be the same as its associated company's owner. Columns marked "N/A — no data source" (next scheduled
+    expansion/downgrade dates, forecasted MRR, renewal probability) have no real data source via the connected
+    Stripe/ProfitWell/HubSpot APIs and are never estimated or fabricated.
   </div>
 </div>
 
@@ -123,6 +125,11 @@ const KPI_DEFS = [
 
 let currentData = null;
 let sortState = { key: null, dir: 1 };
+
+const PLACEHOLDER_VALUES = new Set([
+  'Not provided', 'Unassigned', 'Not found in HubSpot',
+  'HubSpot not configured', 'HubSpot authentication error', 'HubSpot lookup failed',
+]);
 
 const fmtMoney = (v) => (v == null || Number.isNaN(v)) ? '' :
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
@@ -175,6 +182,8 @@ function baseColumns() {
     { key: 'billingCycle', label: 'Billing Cycle' },
     { key: 'paymentType', label: 'Payment Type' },
     { key: 'country', label: 'Location/Country' },
+    { key: 'contactOwner', label: 'Contact Owner (HubSpot)' },
+    { key: 'companyOwner', label: 'Company Owner (HubSpot)' },
     { key: 'currentMrr', label: 'Current MRR (customer)' },
     { key: 'renewalDate', label: 'Renewal Date' },
     { key: 'expectedArrAtRenewal', label: 'Expected ARR at Renewal (estimated)' },
@@ -242,6 +251,8 @@ function renderRows() {
       row.billingCycle,
       row.paymentType,
       row.country,
+      row.contactOwner,
+      row.companyOwner,
       fmtMoney(row.currentMrr),
       fmtDate(row.renewalDate),
       fmtMoney(row.expectedArrAtRenewal),
@@ -251,6 +262,7 @@ function renderRows() {
     for (const c of cells) {
       const td = document.createElement('td');
       td.textContent = c;
+      if (PLACEHOLDER_VALUES.has(c)) td.className = 'na';
       tr.appendChild(td);
     }
     for (const m of currentData.months) {

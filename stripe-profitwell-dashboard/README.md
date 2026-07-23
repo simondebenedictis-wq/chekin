@@ -1,24 +1,27 @@
-# Stripe / ProfitWell subscription dashboard
+# Stripe / ProfitWell / HubSpot subscription dashboard
 
 Live customer/subscription table with company-wide MRR metrics. Stripe is the
 source of truth for per-customer/subscription rows; ProfitWell supplies the
-company-level MRR summary panel above the table.
+company-level MRR summary panel above the table; HubSpot supplies the contact
+owner and company owner (account manager) for each customer.
 
 ## Setup
 
 ```
 cd stripe-profitwell-dashboard
 npm install
-cp .env.example .env   # then fill in STRIPE_SECRET_KEY and PROFITWELL_TOKEN
+cp .env.example .env   # then fill in STRIPE_SECRET_KEY, PROFITWELL_TOKEN, HUBSPOT_ACCESS_TOKEN
 npm start
 ```
 
 Open http://localhost:3000. Click **Refresh Data** to re-fetch everything
-from Stripe + ProfitWell without a page reload.
+from Stripe + ProfitWell + HubSpot without a page reload.
 
-`STRIPE_SECRET_KEY` must be a backend-only secret key (`sk_...`). It is only
-read in `server.js` via `process.env` and is never sent to, or embedded in,
-the frontend.
+`STRIPE_SECRET_KEY` and `HUBSPOT_ACCESS_TOKEN` must be backend-only secrets.
+They are only read in `server.js` via `process.env` and are never sent to, or
+embedded in, the frontend. `HUBSPOT_ACCESS_TOKEN` is a private-app or OAuth
+token with `crm.objects.contacts.read`, `crm.objects.companies.read`, and
+`crm.objects.owners.read` scopes.
 
 ## What each part does
 
@@ -33,7 +36,17 @@ the frontend.
      extra API call per customer.
   3. Calls ProfitWell's `GET /v2/metrics/monthly/` for the company-wide
      summary panel.
-  4. Merges everything into one JSON response.
+  4. For each unique customer email, calls HubSpot to resolve the contact's
+     owner (`POST /crm/v3/objects/contacts/search` on email, reading
+     `hubspot_owner_id`) and, separately, the associated company's owner
+     (`GET .../contacts/{id}/associations/companies` then
+     `GET /crm/v3/objects/companies/{id}?properties=hubspot_owner_id`), then
+     resolves both owner ids to display names via `GET /crm/v3/owners/{id}`.
+     Owner-name lookups are cached per refresh so the same owner (often the
+     same person across many accounts) isn't re-fetched. Lookups are deduped
+     by email so a customer with multiple subscriptions only triggers one
+     HubSpot round-trip.
+  5. Merges everything into one JSON response.
 - `public/index.html` — single-file frontend: table, refresh button,
   loading spinner, error banner, simple client-side sort/filter.
 
@@ -65,3 +78,22 @@ the frontend.
 - For accounts with very large customer/invoice counts, the invoice listing
   call can take a while since Stripe paginates 100 rows at a time; there's no
   caching layer here, by design, since every click is meant to re-fetch live.
+- **HubSpot calls could not be tested live from this session** — the same
+  network policy that blocks `api.profitwell.com` also blocks
+  `api.hubapi.com` here. The endpoints and field names used
+  (`hubspot_owner_id`, the contacts-search filter shape, the associations
+  endpoint, `GET /crm/v3/owners/{id}`) are stable, documented HubSpot v3 CRM
+  APIs, but run this once against your real HubSpot account and confirm the
+  owner columns populate as expected before relying on it.
+- **"Contact Owner" and "Company Owner" are reported separately, never
+  merged.** A contact's owner and its associated company's owner are
+  frequently different people; the dashboard never assumes they're the same
+  "account manager." If a customer's email has no matching HubSpot contact,
+  both columns show "Not found in HubSpot"; if a contact/company exists but
+  has no owner assigned, that column shows "Unassigned"; if
+  `HUBSPOT_ACCESS_TOKEN` is missing or invalid, columns show "HubSpot not
+  configured" / "HubSpot authentication error" respectively — never a
+  guessed name.
+- A contact is matched to **one** associated company (the first one HubSpot's
+  associations API returns). If a contact is associated with more than one
+  company, only that first company's owner is shown.
