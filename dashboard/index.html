@@ -148,7 +148,7 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
     <span class="logo-label">Inventory Dashboard</span>
   </div>
   <div class="header-meta">
-    <strong id="headerDate">Week of Jul 17, 2026</strong>
+    <strong id="headerDate">Week of Jul 24, 2026</strong>
     <span>Data snapshot — updated manually each week</span>
   </div>
 </div>
@@ -282,7 +282,7 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 </div><!-- content -->
 
 <div class="footer">
-  Chekin Inventory Dashboard &nbsp;·&nbsp; Data snapshot: Jul 17, 2026 &nbsp;·&nbsp; Jan 2, 2026 baseline
+  Chekin Inventory Dashboard &nbsp;·&nbsp; Data snapshot: Jul 24, 2026 &nbsp;·&nbsp; Jan 2, 2026 baseline
 </div>
 
 <script>
@@ -431,6 +431,7 @@ function parseSmartInbox(dataRows) {
 // ════════════════════════════════════════════════════════════════════════
 const STATIC_ROWS = {
   bu: [
+    [[2026,6,24],0.1940545603,29421,1696,181033,0.009457055711,80752,97493,2788,null,332,0.004128326287,1397,0.01737130067,-33,-0.01169797944,142725,86070,886,36568.0,46714.0,2788.0,null,49511,230,31505.0,18006.0,0.0,null,7144,57,107.0,7037.0,0.0,null,38308,523,12572.0,25736.0,null,null],
     [[2026,6,17],0.1828681107,27725,4285,179337,0.02447844069,80420,96096,2821,null,2895,0.03734279265,1405,0.01812318607,-15,-0.005289139633,141552,85184,1665,36586.0,45777.0,2821.0,null,49281,405,31360.0,17921.0,0.0,null,7087,54,107.0,6980.0,0.0,null,37785,2161,12367.0,25418.0,null,null],
     [[2026,6,10],0.1546051764,23440,-489,175052,-0.002785674002,77525,94691,2836,null,-1623,-0.0205058877,1116,0.01410016678,18,0.006387508872,139428,83519,-1765,35692.0,44991.0,2836.0,null,48876,430,31037.0,17839.0,0.0,null,7033,147,116.0,6917.0,0.0,null,35624,699,10680.0,24944.0,null,null],
     [[2026,6,3],0.1578305147,23929,3360,175541,0.01951434827,79148,93575,2818,null,2898,0.03800655738,462,0.006059016393,0,0,null,85284,3857,37816.0,44650.0,2818.0,null,48446,253,30834.0,17612.0,0.0,null,6886,-220,116.0,6770.0,0.0,null,34925,-530,10382.0,24543.0,null,null],
@@ -460,9 +461,9 @@ const STATIC_ROWS = {
     [[2026,0,16],-0.004452154183,-675,-675,150937,-0.004452154183,65821.0,80482.0,4634.0,null,-1063,-0.01589318821,551,0.008238143652,-163,-0.03397957056,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0,0,383,151612,0.002532583036,66884.0,79931.0,4797.0,null,277,0.004158722056,148,0.00222198868,-42,-0.008679479231,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],-0.002526185262,-383,-165,151229,-0.001089871461,66607.0,79783.0,4839.0,null,-312,-0.004662352994,209,0.003123178768,-62,-0.01265047949,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.5324830448,52604,-740,151394,-0.004864132935,66919.0,79574.0,4901.0,null,-368,-0.005469109932,-372,-0.005528556779,0,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   idv: [
+    [[2026,6,24],0.1152220866,0.2667921778,4474,44,20859,0.002113860197,8618,12167,74,null,null,null,null,null,null,null,16500,-162,6796.0,9630.0,74.0,null,1140,39,456.0,684.0,0.0,null,851,11,0.0,851.0,0.0,null,2368,156,1366.0,1002.0,null,null,null,null],
     [[2026,6,17],0.1160664001,0.2641200049,4430,723,20815,0.03598447143,8684,12059,72,null,null,null,null,null,null,null,16662,692,7020.0,9570.0,72.0,null,1101,-12,441.0,660.0,0.0,null,840,-1,0.0,840.0,0.0,null,2212,44,1223.0,989.0,null,null,null,null],
     [[2026,6,10],0.1147773233,0.2202113446,3707,732,20092,0.03780991736,8311,11709,72,null,null,null,null,null,null,null,15970,610,6670.0,9228.0,72.0,null,1113,0,457.0,656.0,0.0,null,841,49,0.0,841.0,0.0,null,2168,73,1184.0,984.0,null,null,null,null],
     [[2026,6,3],0.1102876251,0.1757561035,2975,-185,19360,-0.009465336403,7886,11402,72,null,null,null,null,null,null,null,15360,-151,6294.0,8994.0,72.0,null,1113,18,481.0,632.0,0.0,null,792,-25,0.0,792.0,0.0,null,2095,-27,1111.0,984.0,null,null,null,null],
@@ -492,9 +493,9 @@ const STATIC_ROWS = {
     [[2026,0,16],0.1087142318,-0.00346167861,24,-57,16409,-0.00346167861,5806.0,10526.0,77.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0.1086061789,0,81,81,16466,0.004943545926,5823.0,10566.0,77.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],0.1083456215,-0.004919227499,0,141,16385,0.008680128047,5739.0,10569.0,77.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.107296194,0.5575798255,5815,-120,16244,-0.007333170374,5807.0,10360.0,77.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   remote: [
+    [[2026,6,24],0.05692884723,0.06061541628,669,59,10306,0.005757782766,4276,6030,0,null,8610,44,3679.0,4931.0,0.0,null,1114,12,584.0,530.0,0.0,null,577,3,11.0,566.0,0.0,null,5,0,2.0,3.0,0.0,null],
     [[2026,6,17],0.05713823695,0.05454358341,610,-117,10247,-0.01128907758,4264,5983,0,null,8566,-131,3671.0,4895.0,0.0,null,1102,11,580.0,522.0,0.0,null,574,3,11.0,563.0,0.0,null,5,0,2.0,3.0,0.0,null],
     [[2026,6,10],0.05920526472,0.06658433673,727,502,10364,0.05090245386,4507,5857,0,null,8697,492,3907.0,4790.0,0.0,null,1091,11,578.0,513.0,0.0,null,571,-1,20.0,551.0,0.0,null,5,0,2.0,3.0,0.0,null],
     [[2026,6,3],0.05618060738,0.01492230112,225,97,9862,0.00993343574,4164,5698,0,null,8205,56,3570.0,4635.0,0.0,null,1080,66,572.0,508.0,0.0,null,572,-25,20.0,552.0,0.0,null,5,0,2.0,3.0,0.0,null],
@@ -524,9 +525,9 @@ const STATIC_ROWS = {
     [[2026,0,16],0.0646561148,0.004322321704,122,42,9759,0.004322321704,3953.0,5806.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0.06409123288,0,80,80,9717,0.008301338591,3923.0,5794.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],0.06372455019,-0.008232993722,0,199,9637,0.02108497563,3831.0,5806.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.06234064758,1.098732488,4941,-51,9438,-0.005374644325,3720.0,5718.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   branded: [
+    [[2026,6,24],0.08105704485,0.139108834,1792,-222,14674,-0.01490332975,6403,8240,31,null,null,13725,-224,6108.0,7586.0,31.0,null,622,0,209.0,413.0,0.0,null,241,2,0.0,241.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
     [[2026,6,17],0.08306149874,0.1563421829,2014,1486,14896,0.1108128262,6630,8235,31,null,null,13949,1471,6335.0,7583.0,31.0,null,622,8,209.0,413.0,0.0,null,239,7,0.0,239.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
     [[2026,6,10],0.07660580856,0.04098742431,528,-176,13410,-0.012954512,5212,8167,31,null,null,12478,-272,4925.0,7522.0,31.0,null,614,74,201.0,413.0,0.0,null,232,22,0.0,232.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
     [[2026,6,3],0.07739502452,0.05464989908,704,183,13586,0.01365365963,5238,8317,31,null,null,12750,164,4969.0,7750.0,31.0,null,540,27,183.0,357.0,0.0,null,210,-8,0.0,210.0,0.0,null,86,0,86.0,0.0,0.0,null,null],
@@ -556,9 +557,9 @@ const STATIC_ROWS = {
     [[2026,0,16],0.07982138243,-0.06474149977,-834,-831,12048,-0.06452364314,2592,9425.0,31.0,null,5541.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0.08494710181,-0.0002328830927,-3,-3,12879,-0.0002328830927,2604,10244.0,31.0,null,5541.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],0.08518207487,0,0,158,12882,0.01241747878,2609,10242.0,31.0,null,5541.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.08404560286,1.863830745,8281,-5927,12724,-0.3177845692,2729,9964.0,31.0,null,5541.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   guide: [
+    [[2026,6,24],0.02574116321,0.2540365985,4660,-167,4660,-0.03459705821,1875,2785,0,null,4659,-167,1875.0,2784.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
     [[2026,6,17],0.02691580655,0.298977395,4827,22,4827,0.004578563996,2021,2806,0,null,4826,22,2021.0,2805.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
     [[2026,6,10],0.02744898659,0.2930570506,4805,514,4805,0.1197855978,2073,2732,0,null,4804,514,2073.0,2731.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
     [[2026,6,3],0.02444443179,0.1547362756,4291,-191,4291,-0.04261490406,1779,2512,0,null,4290,-191,1779.0,2511.0,0.0,null,0,0,0.0,0.0,0.0,null,0,0,0.0,0.0,0.0,null,1,0,0.0,1.0,0.0,null],
@@ -589,6 +590,7 @@ const STATIC_ROWS = {
     [[2026,0,9],0.02450993325,0,3716,3716,3716,"#REF!",1693.0,2023.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   einvoice: [
+    [[2026,6,24],0.001591348639,8.448275862,211,-19,274,-0.06484641638,5.0,269,0.0,null,32.0,102.0,null,null,0.0,167.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,6,17],0.001690095349,9.103448276,230,15,293,0.05395683453,5.0,288,0.0,null,7.0,121.0,null,null,0.0,167.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,6,10],0.001618857948,8.586206897,215,21,278,0.08171206226,5.0,273,0.0,null,7.0,112.0,null,null,0.0,161.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,6,3],0.001504322733,7.862068966,194,9,257,0.03629032258,5.0,252,0.0,null,5.0,91.0,null,null,0.0,161.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
@@ -612,6 +614,7 @@ const STATIC_ROWS = {
     [[2026,1,20],0.0001893333507,null,null,null,29,"#REF!",0.0,29.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   tax: [
+    [[2026,6,24],0.05164804207,0.5092816788,3101,253,9350,0.02781136638,2384,6966,0,null,null,null,null,null,null,null,7615,0.01411639366,1967.0,5648.0,0.0,null,755,0.188976378,331.0,424.0,0.0,null,768,0.01453104359,0.0,768.0,0.0,null,212,0.08163265306,86.0,126.0,0.0,null],
     [[2026,6,17],0.05072572866,0.4684422922,2848,-390,9097,-0.04110888584,2369,6728,0,null,null,null,null,null,null,null,7509,-0.05570925553,1976.0,5533.0,0.0,null,635,0.03927986907,307.0,328.0,0.0,null,757,-0.01688311688,0.0,757.0,0.0,null,196,0.2727272727,86.0,110.0,0.0,null],
     [[2026,6,10],0.05419532482,0.5313962873,3238,2368,9487,0.3326309875,2385,7102,0,null,null,null,null,null,null,null,7952,0.3248917028,2025.0,5927.0,0.0,null,611,1.009868421,314.0,297.0,0.0,null,770,0.1666666667,0.0,770.0,0.0,null,154,0.006535947712,46.0,108.0,0.0,null],
     [[2026,6,3],0.04055462826,0.1491525424,870,606,7119,0.09304467987,1651,5468,0,null,null,null,null,null,null,null,6002,0.09545537507,1498.0,4504.0,0.0,null,304,0.3818181818,107.0,197.0,0.0,null,660,-0.001512859304,0.0,660.0,0.0,null,153,0,46.0,107.0,0.0,null],
@@ -641,9 +644,9 @@ const STATIC_ROWS = {
     [[2026,0,16],0.04142788051,0.009362389023,4,58,6253,0.009362389023,1729.0,4519.0,5.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0.04086088172,0,-54,-54,6195,-0.008641382621,1738.0,4452.0,5.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],0.04132143967,0.008716707022,0,74,6249,0.01198380567,1748.0,4496.0,5.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.04078761378,0.4046860783,1779,41,6175,0.006684056081,1732.0,4438.0,5.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   deposit: [
+    [[2026,6,24],0.02099617197,-0.3274946921,-1864,2,3801,0.0005264543301,224.0,3577.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#REF!",2584,-0.0007733952049,183.0,2401.0,0.0,null,"#REF!",1217,0.003297609233,41,1176,0,null,null,null,null,null,null,null,null,null,null,null,92,null,25.0,67.0,0.0,null,203,null,5.0,198.0,0.0,null,3,null,0.0,3.0,0.0,null,null],
     [[2026,6,17],0.02118358175,-0.3278485492,-1866,-673,3799,-0.1504919499,224.0,3575.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#REF!",2586,-0.1735378715,183.0,2403.0,0.0,null,"#REF!",1213,-0.09679821296,41,1172,0,null,null,null,null,null,null,null,null,null,null,null,92,null,25.0,67.0,0.0,null,200,null,5.0,195.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
     [[2026,6,10],0.0255466947,-0.2087756546,-1193,-116,4472,-0.02528334786,301.0,4171.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#REF!",3129,-0.05353901996,231.0,2898.0,0.0,null,"#REF!",1343,0.04758190328,70,1273,0,null,null,null,null,null,null,null,null,null,null,null,110,null,43.0,67.0,0.0,null,198,null,5.0,193.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
     [[2026,6,3],0.02613634422,-0.1882519462,-1077,477,4588,0.116030163,271.0,4317.0,0.0,1534,"-",17.0,1517.0,0.0,null,"#VALUE!",3306,0.1176470588,208.0,3098.0,0.0,null,"#VALUE!",1282,0.1118820468,63,1219,0,null,null,null,null,null,null,null,null,null,null,null,103,null,36.0,67.0,0.0,null,165,null,5.0,160.0,0.0,null,2,null,0.0,2.0,0.0,null,null],
@@ -673,9 +676,9 @@ const STATIC_ROWS = {
     [[2026,0,16],0.03561750929,-0.04883227176,-289,-276,5376,-0.04883227176,217.0,5159.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02304272644,3478,-0.07302771855,206.0,3272.0,0.0,null,0.01257478286,1898,-0.001052631579,11,1887,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0.03727937103,0,-13,-13,5652,-0.002294792586,218.0,5434.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02474738147,3752,-0.002658160553,207.0,3545.0,0.0,null,0.01253198955,1900,-0.001576458224,11,1889,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],0.03745974648,0.002300070771,0,196,5665,0.03583836167,218.0,5447.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02487618116,3762,0.05201342282,207.0,3555.0,0.0,null,0.01258356532,1903,0.00528262018,11,1892,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.03612428498,0.6477854776,2150,-69,5469,-0.01245937161,218.0,5251.0,0.0,1534,"-",17.0,1517.0,0.0,null,0.02362048694,3576,-0.01893004115,207.0,3369.0,0.0,null,0.01250379804,1893,0,11,1882,0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   damage: [
+    [[2026,6,24],0.006245272536,-0.1579422383,-175,-57,933,-0.05757575758,46,887,0,null,847,-51,46.0,801.0,0.0,null,14,0,0.0,14.0,0.0,null,72,-6,0.0,72.0,0.0,null,0,null,0.0,0.0,0.0,null],
     [[2026,6,17],0.006646257955,-0.1064981949,-118,-68,990,-0.06427221172,46,944,0,null,898,-69,46.0,852.0,0.0,null,14,0,0.0,14.0,0.0,null,78,1,0.0,78.0,0.0,null,0,null,0.0,0.0,0.0,null],
     [[2026,6,10],0.00710591712,-0.04512635379,-50,-272,1058,-0.2045112782,46,1012,0,null,967,-279,46.0,921.0,0.0,null,14,0,0.0,14.0,0.0,null,77,7,0.0,77.0,0.0,null,0,null,0.0,0.0,0.0,null],
     [[2026,6,3],0.009022821633,0.2003610108,222,4,1330,0.003016591252,30,1300,0,null,1246,8,30.0,1216.0,0.0,null,14,0,0.0,14.0,0.0,null,70,-4,0.0,70.0,0.0,null,0,null,0.0,0.0,0.0,null],
@@ -705,9 +708,9 @@ const STATIC_ROWS = {
     [[2026,0,16],0.008517444023,-0.1732851986,-192,-189,916,-0.171040724,44.0,872.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,9],0.01043713163,-0.002707581227,-3,-3,1105,-0.002707581227,44.0,1061.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,0,2],0.01059759737,0,0,21,1108,0.01931922723,44.0,1064.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
-    [[2025,11,26],0.01050820258,"#REF!","#REF!",125,1087,0.1299376299,44.0,1043.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],
   ],
   inbox: [
+    [[2026,6,24],1.479166667,142,142,238,0.04845814978,143,95,null,23.0,118.0,2.0,null,null,95,0.01063829787,18.0,76.0,1.0,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,6,17],1.364583333,131,131,227,0.152284264,133,94,null,22.0,109.0,2.0,null,null,94,0.1325301205,18.0,75.0,1.0,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,6,10],1.052083333,101,101,197,-0.09216589862,114,83,null,20.0,94.0,1.0,null,null,83,-0.2314814815,17.0,66.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
     [[2026,6,3],1.260416667,121,121,217,0.01877934272,109,108,null,26.0,83.0,0.0,null,null,108,0.009345794393,21.0,87.0,0.0,null,null,null,null,null,null,null,null,null,null,null,null],
