@@ -19,6 +19,18 @@ tables, picks the date and country columns by name, and prints what it chose
 so the numbers can be checked against the query that produced them. Override
 any guess with --table / --date-col / --country-col, or use --sql-only to
 print the SQL and run it yourself.
+
+Domain definition of a "tourist tax", per the Jul 2026 avg-rate-by-country
+analysis (model names, not yet confirmed against live table names):
+
+  - a ReservationPayment of type TOURIST_TAXES and status PAID,
+  - with an associated GuestPayment in status COMPLETED,
+  - fee in chekin_feature_fee, in the currency of the charge,
+  - country taken from the housing, via reservation -> housing.
+
+--preset tourist-taxes emits that fully-joined query instead of the flat
+single-table one. Treat it as a starting point to verify, not a checked
+query: those join columns have never been run against production-core.
 """
 import argparse
 import calendar
@@ -115,6 +127,38 @@ def month_bounds(month):
     return start, start + datetime.timedelta(days=last)
 
 
+# The tourist-taxes population as defined by the avg-rate-by-country
+# analysis. Table and join column names are inferred from the model names and
+# are the first thing to check if this errors or returns nothing.
+PRESET_TOURIST_TAXES = """
+        SELECT UPPER(h.country) AS country,
+               COUNT(*) AS taxes_created,
+               SUM(rp.chekin_feature_fee) AS total_fee
+        FROM {payment_table} rp
+        JOIN guest_payment gp ON gp.reservation_payment_id = rp.id
+        JOIN reservation    r ON r.id = rp.reservation_id
+        JOIN housing        h ON h.id = r.housing_id
+        WHERE rp.type   = 'TOURIST_TAXES'
+          AND rp.status = 'PAID'
+          AND gp.status = 'COMPLETED'
+          AND rp.{date_col} >= DATE '{start}'
+          AND rp.{date_col} <  DATE '{end}'
+          AND UPPER(h.country) IN ({in_list})
+        GROUP BY 1
+        ORDER BY 1;
+"""
+
+
+def build_preset_sql(payment_table, date_col, start, end, countries):
+    return PRESET_TOURIST_TAXES.format(
+        payment_table=payment_table,
+        date_col=date_col,
+        start=start,
+        end=end,
+        in_list=', '.join(f"'{c}'" for c in countries),
+    )
+
+
 def build_sql(schema, table, date_col, country_col, amount_col,
               start, end, countries):
     in_list = ', '.join(f"'{c}'" for c in countries)
@@ -194,11 +238,16 @@ def main():
                     help='count rows only, skip the SUM')
     ap.add_argument('--sql-only', action='store_true',
                     help='print the SQL without running the aggregate')
+    ap.add_argument('--preset', choices=['tourist-taxes'], default=None,
+                    help='use the joined ReservationPayment/GuestPayment '
+                         'definition instead of a flat single-table count')
+    ap.add_argument('--payment-table', default='reservation_payment',
+                    help='table behind ReservationPayment (preset only)')
     args = ap.parse_args()
 
     dsn = args.dsn or os.environ.get('DATABASE_URL') or ''
-    needs_db = not (args.sql_only and args.table and args.date_col
-                    and args.country_col)
+    needs_db = not (args.sql_only and (args.preset or (
+        args.table and args.date_col and args.country_col)))
     if needs_db and not dsn and not os.environ.get('PGHOST'):
         raise SystemExit('No connection info: pass --dsn or set PGHOST/PGUSER/'
                          'PGDATABASE/PGPASSWORD.')
@@ -207,6 +256,20 @@ def main():
     if not countries:
         raise SystemExit('--countries produced an empty list')
     start, end = month_bounds(args.month)
+
+    # The preset carries its own joins and column names, so it bypasses
+    # discovery entirely.
+    if args.preset:
+        sql = build_preset_sql(args.payment_table, args.date_col or 'created_at',
+                               start, end, countries)
+        print(f'Preset: {args.preset} (ReservationPayment TOURIST_TAXES/PAID '
+              '+ GuestPayment COMPLETED)')
+        if args.sql_only:
+            print(sql)
+            return
+        print(f'Range: {start} <= rp.{args.date_col or "created_at"} < {end}\n')
+        render(psql(dsn, sql), countries, True, args.month)
+        return
 
     if args.table:
         schema, _, table = args.table.rpartition('.')
