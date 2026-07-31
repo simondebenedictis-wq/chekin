@@ -35,6 +35,7 @@ SHEETS = {
     'tax':      ('TOURIST TAXES ', 41, 3),
     'deposit':  ('SECURITY DEPOSIT', 59, 3),
     'damage':   ('DAMAGE PROTECTION', 35, 3),
+    'liveness': ('LIVENESS', 29, 3),
     'inbox':    ('SMART INBOX', 31, 3),
 }
 
