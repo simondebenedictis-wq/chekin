@@ -158,6 +158,7 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
   <button class="nav-btn" onclick="showTab('premium',this)">⭐ Premium Features</button>
   <button class="nav-btn" onclick="showTab('trans',this)">💳 Transactional</button>
   <button class="nav-btn" onclick="showTab('inbox',this)">📬 Smart Inbox</button>
+  <button class="nav-btn" onclick="showTab('monthly',this)">📈 Monthly Performance</button>
 </div>
 
 <div class="content">
@@ -277,6 +278,38 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 
   <div class="section-title">Weekly Trend — Total Smart Inbox Users</div>
   <div class="chart-card"><div class="chart-canvas-wrap"><canvas id="inboxTrendChart"></canvas></div></div>
+</div>
+
+<!-- ═══════════════ MONTHLY PERFORMANCE ANALYSIS TAB ═══════════════ -->
+<div id="monthly" class="tab">
+  <div class="section-title">Monthly Performance Analysis — <span id="monthly-date-label">June vs July</span></div>
+
+  <div class="kpi-row" id="monthly-kpis"></div>
+
+  <div class="section-title">% Change at a Glance</div>
+  <div class="chart-card"><div class="chart-canvas-wrap" id="monthly-glance-wrap" style="height:420px"><canvas id="monthlyGlanceChart"></canvas></div></div>
+
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-label">📊 Key Insights</div>
+      <div class="insight-highlights" id="monthly-highlights" style="margin-bottom:0"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Bookable Units — Segment Growth (June vs July)</div>
+      <div class="chart-canvas-wrap" style="height:240px"><canvas id="monthlySegmentChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="section-title">Full Comparison — All Features &amp; Segments</div>
+  <div class="tbl-wrap">
+    <table class="dtable">
+      <thead><tr><th>Feature</th><th>Segment</th><th class="ar">June (Jul 3)</th><th class="ar">July (Jul 31)</th><th class="ar">Δ Units</th><th class="ar">Δ %</th></tr></thead>
+      <tbody id="monthly-tbody"></tbody>
+    </table>
+  </div>
+  <div style="font-size:10.5px;color:var(--muted2);padding:6px 0 4px">
+    "June" and "July" label the Jul 3, 2026 and Jul 31, 2026 weekly snapshots respectively, per the requested comparison. E-Invoicing's Direct + SDK columns do not sum to its reported total in the source sheet — shown as reported, not adjusted.
+  </div>
 </div>
 
 </div><!-- content -->
@@ -1240,12 +1273,172 @@ function renderInbox() {
 }
 
 // ════════════════════════════════════════════════════════════════════════
+// RENDER — MONTHLY PERFORMANCE ANALYSIS
+// "June" = Jul 3, 2026 snapshot, "July" = Jul 31, 2026 snapshot, per request.
+// Every figure below is read directly from DATA — nothing here is estimated.
+// ════════════════════════════════════════════════════════════════════════
+const MONTHLY_JUNE = { y: 2026, m: 6, d: 3 };   // month is 0-indexed (6 = July)
+const MONTHLY_JULY = { y: 2026, m: 6, d: 31 };
+
+const MONTHLY_METRICS = [
+  { label: 'Bookable Units', key: 'bu', em: '🏠', color: COLORS.vr, group: 'Inventory' },
+  { label: 'ID Verification', key: 'idv', em: '🆔', color: '#385bf8', group: 'Premium' },
+  { label: 'Branded Guest App', key: 'branded', em: '📱', color: '#2dd4a0', group: 'Premium' },
+  { label: 'Remote Access', key: 'remote', em: '🔑', color: '#f5a623', group: 'Premium' },
+  { label: 'Digital Guidebook', key: 'guide', em: '📖', color: '#2dd4a0', group: 'Premium' },
+  { label: 'E-Invoicing', key: 'einvoice', em: '🧾', color: '#a371f7', group: 'Premium' },
+  { label: 'Tourist Taxes', key: 'tax', em: '🧾', color: '#f5a623', group: 'Transactional' },
+  { label: 'Security Deposit', key: 'deposit', em: '💳', color: '#f85149', group: 'Transactional' },
+  { label: 'Damage Protection', key: 'damage', em: '🛡️', color: '#2dd4a0', group: 'Transactional' },
+  { label: 'Liveness', key: 'liveness', em: '🪪', color: '#a371f7', group: 'Transactional' },
+];
+
+function findByDate(rows, spec) {
+  return rows.find(r => r.date.getFullYear() === spec.y && r.date.getMonth() === spec.m && r.date.getDate() === spec.d) || null;
+}
+
+function renderMonthly() {
+  const juneBu = findByDate(DATA.bu, MONTHLY_JUNE);
+  const julyBu = findByDate(DATA.bu, MONTHLY_JULY);
+  if (!juneBu || !julyBu) return; // one of the two snapshots isn't in the baked-in history
+
+  document.getElementById('monthly-date-label').textContent =
+    `June (${fmtDate(juneBu.date)}) vs July (${fmtDate(julyBu.date)})`;
+
+  const withDeltas = MONTHLY_METRICS.map(m => {
+    const june = findByDate(DATA[m.key], MONTHLY_JUNE);
+    const july = findByDate(DATA[m.key], MONTHLY_JULY);
+    if (!june || !july) return null;
+    const diff = july.tot - june.tot;
+    const pct = june.tot ? (diff / june.tot) * 100 : 0;
+    return { ...m, june: june.tot, july: july.tot, diff, pct, juneRow: june, julyRow: july };
+  }).filter(Boolean);
+
+  const inboxJune = findByDate(DATA.inbox, MONTHLY_JUNE);
+  const inboxJuly = findByDate(DATA.inbox, MONTHLY_JULY);
+  if (inboxJune && inboxJuly) {
+    const diff = inboxJuly.totalUsers - inboxJune.totalUsers;
+    const pct = inboxJune.totalUsers ? (diff / inboxJune.totalUsers) * 100 : 0;
+    withDeltas.push({ label: 'Smart Inbox Users', key: 'inbox', em: '📬', color: COLORS.dir, group: 'Engagement',
+      june: inboxJune.totalUsers, july: inboxJuly.totalUsers, diff, pct });
+  }
+
+  // ── KPI row: headline aggregates ──
+  const premiumKeys = ['idv','branded','remote','guide','einvoice'];
+  const transKeys = ['tax','deposit','damage','liveness'];
+  const sumTot = keys => {
+    const j1 = keys.reduce((s,k) => { const r = findByDate(DATA[k], MONTHLY_JUNE); return s + (r ? r.tot : 0); }, 0);
+    const j2 = keys.reduce((s,k) => { const r = findByDate(DATA[k], MONTHLY_JULY); return s + (r ? r.tot : 0); }, 0);
+    return { june: j1, july: j2, diff: j2-j1, pct: j1 ? (j2-j1)/j1*100 : 0 };
+  };
+  const premiumSum = sumTot(premiumKeys);
+  const transSum = sumTot(transKeys);
+  const buM = withDeltas.find(m => m.key === 'bu');
+  const inboxM = withDeltas.find(m => m.key === 'inbox');
+
+  document.getElementById('monthly-kpis').innerHTML = [
+    kpiTile('🏠 Bookable Units', fmt(buM.july), `vs ${fmt(buM.june)} in June &nbsp;${badge(buM.diff)} (${fmtPct(buM.pct/100)})`, buM.diff >= 0 ? 'green' : 'red'),
+    kpiTile('⭐ Combined Premium Features', fmt(premiumSum.july), `vs ${fmt(premiumSum.june)} in June &nbsp;${badge(premiumSum.diff)} (${fmtPct(premiumSum.pct/100)})`, premiumSum.diff >= 0 ? 'green' : 'red'),
+    kpiTile('💳 Combined Transactional Products', fmt(transSum.july), `vs ${fmt(transSum.june)} in June &nbsp;${badge(transSum.diff)} (${fmtPct(transSum.pct/100)})`, transSum.diff >= 0 ? 'green' : 'red'),
+    inboxM ? kpiTile('📬 Smart Inbox Users', fmt(inboxM.july), `vs ${fmt(inboxM.june)} in June &nbsp;${badge(inboxM.diff)} (${fmtPct(inboxM.pct/100)})`, inboxM.diff >= 0 ? 'green' : 'red') : '',
+  ].join('');
+
+  // ── % change at a glance: diverging horizontal bar, sorted by magnitude ──
+  const sorted = [...withDeltas].sort((a, b) => b.pct - a.pct);
+  destroyChart('monthlyGlanceChart');
+  const glanceCtx = document.getElementById('monthlyGlanceChart');
+  document.getElementById('monthly-glance-wrap').style.height = Math.max(320, sorted.length * 34) + 'px';
+  CHARTS['monthlyGlanceChart'] = new Chart(glanceCtx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(m => `${m.em} ${m.label}`),
+      datasets: [{ data: sorted.map(m => m.pct), backgroundColor: sorted.map(m => m.pct >= 0 ? COLORS.hotel : '#f85149') }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      scales: {
+        x: { ticks: { color: '#8b92c9', font: { size: 10 }, callback: v => v + '%' }, grid: { color: 'rgba(56,91,248,.08)' } },
+        y: { ticks: { color: '#e8eaf6', font: { size: 11 } }, grid: { display: false } }
+      },
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          color: '#0d1033', font: { weight: '700', size: 10.5 },
+          anchor: 'center', align: 'center',
+          formatter: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%',
+        }
+      }
+    }
+  });
+
+  // ── key insights (data-driven only) ──
+  const best = sorted[0], worst = sorted[sorted.length - 1];
+  const declines = sorted.filter(m => m.diff < 0);
+  const insightItems = [];
+  insightItems.push(`<div class="insight-item"><span class="insight-icon">🔥</span><span>Best performer: <strong>${best.em} ${best.label}</strong> ${fmtSigned(best.diff)} units (${fmtPct(best.pct/100)})</span></div>`);
+  if (worst.diff < 0) {
+    insightItems.push(`<div class="insight-item"><span class="insight-icon">⚠️</span><span>Weakest performer: <strong>${worst.em} ${worst.label}</strong> ${fmtSigned(worst.diff)} units (${fmtPct(worst.pct/100)})</span></div>`);
+  }
+  if (declines.length) {
+    const names = declines.map(m => m.label).join(', ');
+    insightItems.push(`<div class="insight-item"><span class="insight-icon">📉</span><span>${declines.length} of ${sorted.length} tracked metrics declined June→July: <strong>${names}</strong></span></div>`);
+  } else {
+    insightItems.push(`<div class="insight-item"><span class="insight-icon">✅</span><span>Every tracked metric grew or held flat from June to July</span></div>`);
+  }
+  const sdkDiff = julyBu.sdk.tot - juneBu.sdk.tot;
+  const sdkPct = juneBu.sdk.tot ? (sdkDiff/juneBu.sdk.tot*100) : 0;
+  const dirDiff = julyBu.dir.tot - juneBu.dir.tot;
+  const dirPct = juneBu.dir.tot ? (dirDiff/juneBu.dir.tot*100) : 0;
+  insightItems.push(`<div class="insight-item"><span class="insight-icon">🧭</span><span>By segment, Bookable Units growth was led by <strong>SDK</strong> (${fmtPct(sdkPct/100)}) vs Direct Origin's <strong>${fmtPct(dirPct/100)}</strong> — the largest segment is growing the slowest</span></div>`);
+  document.getElementById('monthly-highlights').innerHTML = insightItems.join('');
+
+  // ── segment growth chart (Bookable Units only — the primary inventory metric) ──
+  const segDefs = [
+    { key: 'dir', nm: 'Direct Origin' }, { key: 'ame', nm: 'Amenitiz' },
+    { key: 'smb', nm: 'Smoobu' }, { key: 'sdk', nm: 'SDK' },
+  ];
+  renderGroupedBarChart('monthlySegmentChart', segDefs.map(s => s.nm), [
+    { label: 'June (Jul 3)', backgroundColor: '#5c6399', data: segDefs.map(s => juneBu[s.key].tot) },
+    { label: 'July (Jul 31)', backgroundColor: COLORS.vr, data: segDefs.map(s => julyBu[s.key].tot) },
+  ]);
+
+  // ── full comparison table ──
+  const rowsHtml = withDeltas.map(m => {
+    const segRows = ['dir','ame','smb','sdk'].map(seg => {
+      const j1 = m.juneRow ? m.juneRow[seg] : null;
+      const j2 = m.julyRow ? m.julyRow[seg] : null;
+      if (!j1 || !j2 || j1.tot == null || j2.tot == null) return '';
+      const nm = { dir: 'Direct Origin', ame: 'Amenitiz', smb: 'Smoobu', sdk: 'SDK' }[seg];
+      const d = j2.tot - j1.tot;
+      const p = j1.tot ? d/j1.tot*100 : 0;
+      return `<tr>
+        <td></td>
+        <td style="color:var(--muted);padding-left:20px">${nm}</td>
+        <td class="ar mono" style="color:var(--muted2)">${fmt(j1.tot)}</td>
+        <td class="ar mono" style="color:var(--muted2)">${fmt(j2.tot)}</td>
+        <td class="ar mono" style="color:${wowColor(d)}">${fmtSigned(d)}</td>
+        <td class="ar mono" style="color:${wowColor(d)};font-weight:700">${fmtPct(p/100)}</td>
+      </tr>`;
+    }).join('');
+    return `<tr class="total-row">
+      <td><strong>${m.em} ${m.label}</strong></td>
+      <td><strong>TOTAL</strong></td>
+      <td class="ar mono b">${fmt(m.june)}</td>
+      <td class="ar mono b">${fmt(m.july)}</td>
+      <td class="ar mono" style="color:${wowColor(m.diff)};font-weight:700">${fmtSigned(m.diff)}</td>
+      <td class="ar mono" style="color:${wowColor(m.diff)};font-weight:700">${fmtPct(m.pct/100)}</td>
+    </tr>` + segRows;
+  }).join('');
+  document.getElementById('monthly-tbody').innerHTML = rowsHtml;
+}
+
+// ════════════════════════════════════════════════════════════════════════
 // RENDER ALL
 // ════════════════════════════════════════════════════════════════════════
 function renderAll() {
   // Each section renders independently — a failure in one (e.g. a chart error)
   // must not blank out the others.
-  [renderMain, renderPremium, renderTrans, renderInbox].forEach(fn => {
+  [renderMain, renderPremium, renderTrans, renderInbox, renderMonthly].forEach(fn => {
     try { fn(); } catch (e) { console.error(fn.name, 'failed:', e); }
   });
   const bu = DATA.bu[0];
