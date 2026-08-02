@@ -284,7 +284,7 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 <div id="monthly" class="tab">
   <div class="section-title">Monthly Performance Analysis — <span id="monthly-date-label">June vs July</span></div>
 
-  <div class="kpi-row" id="monthly-kpis"></div>
+  <div class="kpi-row" id="monthly-kpis" style="grid-template-columns:minmax(190px,320px)"></div>
 
   <div class="section-title">% Change at a Glance</div>
   <div class="chart-card"><div class="chart-canvas-wrap" id="monthly-glance-wrap" style="height:420px"><canvas id="monthlyGlanceChart"></canvas></div></div>
@@ -1323,24 +1323,12 @@ function renderMonthly() {
       june: inboxJune.totalUsers, july: inboxJuly.totalUsers, diff, pct });
   }
 
-  // ── KPI row: headline aggregates ──
-  const premiumKeys = ['idv','branded','remote','guide','einvoice'];
-  const transKeys = ['tax','deposit','damage','liveness'];
-  const sumTot = keys => {
-    const j1 = keys.reduce((s,k) => { const r = findByDate(DATA[k], MONTHLY_JUNE); return s + (r ? r.tot : 0); }, 0);
-    const j2 = keys.reduce((s,k) => { const r = findByDate(DATA[k], MONTHLY_JULY); return s + (r ? r.tot : 0); }, 0);
-    return { june: j1, july: j2, diff: j2-j1, pct: j1 ? (j2-j1)/j1*100 : 0 };
-  };
-  const premiumSum = sumTot(premiumKeys);
-  const transSum = sumTot(transKeys);
+  // ── KPI row ── (no combined/summed metrics — each feature is tracked
+  // and shown individually, never aggregated across unlike things)
   const buM = withDeltas.find(m => m.key === 'bu');
-  const inboxM = withDeltas.find(m => m.key === 'inbox');
 
   document.getElementById('monthly-kpis').innerHTML = [
     kpiTile('🏠 Bookable Units', fmt(buM.july), `vs ${fmt(buM.june)} in June &nbsp;${badge(buM.diff)} (${fmtPct(buM.pct/100)})`, buM.diff >= 0 ? 'green' : 'red'),
-    kpiTile('⭐ Combined Premium Features', fmt(premiumSum.july), `vs ${fmt(premiumSum.june)} in June &nbsp;${badge(premiumSum.diff)} (${fmtPct(premiumSum.pct/100)})`, premiumSum.diff >= 0 ? 'green' : 'red'),
-    kpiTile('💳 Combined Transactional Products', fmt(transSum.july), `vs ${fmt(transSum.june)} in June &nbsp;${badge(transSum.diff)} (${fmtPct(transSum.pct/100)})`, transSum.diff >= 0 ? 'green' : 'red'),
-    inboxM ? kpiTile('📬 Smart Inbox Users', fmt(inboxM.july), `vs ${fmt(inboxM.june)} in June &nbsp;${badge(inboxM.diff)} (${fmtPct(inboxM.pct/100)})`, inboxM.diff >= 0 ? 'green' : 'red') : '',
   ].join('');
 
   // ── % change at a glance: diverging horizontal bar, sorted by magnitude ──
