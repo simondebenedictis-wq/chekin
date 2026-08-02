@@ -385,6 +385,11 @@ const OFFSETS = {
              dir:{tot:17,H:19,VR:20,UNK:21}, ame:{tot:23,H:25,VR:26,UNK:27}, smb:{tot:29,H:31,VR:32,UNK:33}, sdk:{tot:35,H:37,VR:38,UNK:39} },
   noFiller: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9,
              dir:{tot:11,H:13,VR:14,UNK:15}, ame:{tot:17,H:19,VR:20,UNK:21}, smb:{tot:23,H:25,VR:26,UNK:27}, sdk:{tot:29,H:31,VR:32,UNK:33} },
+  // BRANDED GUEST APP has one extra blank column vs. DIGITAL GUIDEBOOK/DAMAGE
+  // PROTECTION, shifting every segment column +1 — verified against the
+  // sheet directly (dir TOT sits at col 12, not 11).
+  noFillerShift1: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9,
+             dir:{tot:12,H:14,VR:15,UNK:16}, ame:{tot:18,H:20,VR:21,UNK:22}, smb:{tot:24,H:26,VR:27,UNK:28}, sdk:{tot:30,H:32,VR:33,UNK:34} },
   basicOnly: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9 },
 };
 
@@ -773,7 +778,7 @@ function hydrateFromStatic() {
   DATA.bu = parseFeatureRows(toDataRows(STATIC_ROWS.bu), OFFSETS.bu);
   DATA.idv = parseFeatureRows(toDataRows(STATIC_ROWS.idv), OFFSETS.withFiller);
   DATA.remote = parseFeatureRows(toDataRows(STATIC_ROWS.remote), OFFSETS.noFiller);
-  DATA.branded = parseFeatureRows(toDataRows(STATIC_ROWS.branded), OFFSETS.noFiller);
+  DATA.branded = parseFeatureRows(toDataRows(STATIC_ROWS.branded), OFFSETS.noFillerShift1);
   DATA.guide = parseFeatureRows(toDataRows(STATIC_ROWS.guide), OFFSETS.noFiller);
   DATA.tax = parseFeatureRows(toDataRows(STATIC_ROWS.tax), OFFSETS.withFiller);
   DATA.damage = parseFeatureRows(toDataRows(STATIC_ROWS.damage), OFFSETS.noFiller);
