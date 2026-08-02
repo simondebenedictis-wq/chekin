@@ -979,7 +979,6 @@ function renderMain() {
     kpiTile('Total Bookable Units', fmt(tw.tot), `vs ${fmt(lw.tot)} last week &nbsp;${badge(tw.tot - (lw.tot||0))}`, 'blue'),
     kpiTile("% Change Since Jan 2026", fmtPct(tw.pctJan), 'vs Jan 2, 2026 baseline', tw.pctJan >= 0 ? 'green' : 'red'),
     kpiTile('Cumulative Build Since Feb 2, 2026', fmtSigned(tw.cumul), 'Inventory added since baseline', 'cyan'),
-    kpiTile('Total Inventory (Column E)', fmt(tw.tot), 'Grand total, sheet column E', 'purple'),
     kpiTile('Weekly Bookable Unit Growth', fmtSigned(tw.weekly), `vs ${fmtDate(lw.date)}`, tw.weekly >= 0 ? 'green' : 'red'),
   ];
   document.getElementById('main-kpis').innerHTML = kpis.join('');
