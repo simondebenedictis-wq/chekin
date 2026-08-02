@@ -360,7 +360,14 @@ function fmtDate(d) {
 function parseFeatureRows(dataRows, off) {
   return dataRows.map(({ date, cells }) => {
     const g = i => (i == null ? null : num(cells[i]));
-    const seg = block => block ? { tot: g(block.tot), H: g(block.H), VR: g(block.VR), UNK: g(block.UNK) } : null;
+    // Some sheets (e.g. E-INVOICING) only have H/VR/UNK per origin with no
+    // explicit TOT column — compute it from the parts in that case.
+    const seg = block => {
+      if (!block) return null;
+      const H = g(block.H), VR = g(block.VR), UNK = g(block.UNK);
+      const tot = block.tot != null ? g(block.tot) : (H || 0) + (VR || 0) + (UNK || 0);
+      return { tot, H, VR, UNK };
+    };
     return {
       date,
       pctJan: g(off.pctJan),
@@ -391,6 +398,10 @@ const OFFSETS = {
   noFillerShift1: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9,
              dir:{tot:12,H:14,VR:15,UNK:16}, ame:{tot:18,H:20,VR:21,UNK:22}, smb:{tot:24,H:26,VR:27,UNK:28}, sdk:{tot:30,H:32,VR:33,UNK:34} },
   basicOnly: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9 },
+  // E-INVOICING only tracks Direct + SDK (no Amenitiz/Smoobu), and each
+  // origin has just H/VR/UNK with no TOT column of its own.
+  einvoice: { pctJan:2, cumul:3, weekly:4, tot:5, H:7, VR:8, UNK:9,
+             dir:{H:11,VR:12,UNK:13}, sdk:{H:15,VR:16,UNK:17} },
 };
 
 function parseSecurityDeposit(dataRows) {
@@ -782,7 +793,7 @@ function hydrateFromStatic() {
   DATA.guide = parseFeatureRows(toDataRows(STATIC_ROWS.guide), OFFSETS.noFiller);
   DATA.tax = parseFeatureRows(toDataRows(STATIC_ROWS.tax), OFFSETS.withFiller);
   DATA.damage = parseFeatureRows(toDataRows(STATIC_ROWS.damage), OFFSETS.noFiller);
-  DATA.einvoice = parseFeatureRows(toDataRows(STATIC_ROWS.einvoice), OFFSETS.basicOnly);
+  DATA.einvoice = parseFeatureRows(toDataRows(STATIC_ROWS.einvoice), OFFSETS.einvoice);
   DATA.liveness = parseFeatureRows(toDataRows(STATIC_ROWS.liveness), OFFSETS.basicOnly);
   DATA.deposit = parseSecurityDeposit(toDataRows(STATIC_ROWS.deposit));
   DATA.inbox = parseSmartInbox(toDataRows(STATIC_ROWS.inbox));
