@@ -94,6 +94,9 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .tag-ame{background:rgba(163,113,247,.12);color:#a371f7}
 .tag-smb{background:rgba(57,211,83,.12);color:#39d353}
 .tag-sdk{background:rgba(210,153,34,.12);color:#d29922}
+.tag-total{background:rgba(56,91,248,.18);color:#7ea2ff}
+.origin-card-total{border-color:rgba(56,91,248,.4);border-width:1.5px;background:linear-gradient(135deg,var(--bg2),rgba(56,91,248,.06))}
+.origin-card-total .origin-val{font-size:26px;color:#fff}
 .origin-val{font-size:22px;font-weight:800;letter-spacing:-1px;font-family:var(--mono);margin-bottom:3px}
 .origin-wow{font-size:11px;color:var(--muted);margin-bottom:8px}
 .origin-split{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding-top:8px;border-top:1px solid var(--border)}
@@ -284,9 +287,7 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
 <div id="monthly" class="tab">
   <div class="section-title">Monthly Performance Analysis — <span id="monthly-date-label">June vs July</span></div>
 
-  <div class="kpi-row" id="monthly-kpis" style="grid-template-columns:minmax(190px,320px)"></div>
-
-  <div class="section-title">Bookable Units — Segment Breakdown</div>
+  <div class="section-title" style="margin-top:0">🏠 Bookable Units — June vs July</div>
   <div class="origin-grid" id="monthly-segment-cards"></div>
 
   <div class="section-title">% Change at a Glance</div>
@@ -1329,22 +1330,20 @@ function renderMonthly() {
   // and shown individually, never aggregated across unlike things)
   const buM = withDeltas.find(m => m.key === 'bu');
 
-  document.getElementById('monthly-kpis').innerHTML = [
-    kpiTile('🏠 Bookable Units', fmt(buM.july), `vs ${fmt(buM.june)} in June &nbsp;${badge(buM.diff)} (${fmtPct(buM.pct/100)})`, buM.diff >= 0 ? 'green' : 'red'),
-  ].join('');
-
-  // ── Bookable Units segment breakdown, June vs July ──
+  // ── Bookable Units total + segment breakdown, June vs July, one unified row ──
   const monthlySegDefs = [
+    { key: null, nm: 'Total Bookable Units', tag: 'tag-total', tot: { june: buM.june, july: buM.july } },
     { key: 'dir', nm: 'Direct Origin', tag: 'tag-dir' },
     { key: 'ame', nm: 'Amenitiz', tag: 'tag-ame' },
     { key: 'smb', nm: 'Smoobu', tag: 'tag-smb' },
     { key: 'sdk', nm: 'SDK', tag: 'tag-sdk' },
   ];
   document.getElementById('monthly-segment-cards').innerHTML = monthlySegDefs.map(s => {
-    const j = juneBu[s.key].tot, u = julyBu[s.key].tot;
+    const j = s.key ? juneBu[s.key].tot : s.tot.june;
+    const u = s.key ? julyBu[s.key].tot : s.tot.july;
     const diff = u - j;
     const pct = j ? diff/j*100 : 0;
-    return `<div class="origin-card">
+    return `<div class="origin-card${s.key ? '' : ' origin-card-total'}">
       <div class="origin-tag ${s.tag}">${s.nm}</div>
       <div class="origin-val">${fmt(u)}</div>
       <div class="origin-wow">vs ${fmt(j)} in June &nbsp;<span style="color:${wowColor(diff)};font-weight:700">${fmtSigned(diff)}</span></div>
