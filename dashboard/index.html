@@ -307,12 +307,12 @@ table.dtable tr:hover td{background:rgba(255,255,255,.015)}
   <div class="section-title">Full Comparison — All Features &amp; Segments</div>
   <div class="tbl-wrap">
     <table class="dtable">
-      <thead><tr><th>Feature</th><th>Segment</th><th class="ar">June (Jul 3)</th><th class="ar">July (Jul 31)</th><th class="ar">Δ Units</th><th class="ar">Δ %</th></tr></thead>
+      <thead><tr><th>Feature</th><th>Segment</th><th class="ar">June</th><th class="ar">July</th><th class="ar">Δ Units</th><th class="ar">Δ %</th></tr></thead>
       <tbody id="monthly-tbody"></tbody>
     </table>
   </div>
   <div style="font-size:10.5px;color:var(--muted2);padding:6px 0 4px">
-    "June" and "July" label the Jul 3, 2026 and Jul 31, 2026 weekly snapshots respectively, per the requested comparison. E-Invoicing's Direct + SDK columns do not sum to its reported total in the source sheet — shown as reported, not adjusted.
+    E-Invoicing's Direct + SDK columns do not sum to its reported total in the source sheet — shown as reported, not adjusted.
   </div>
 </div>
 
@@ -1406,8 +1406,8 @@ function renderMonthly() {
     { key: 'smb', nm: 'Smoobu' }, { key: 'sdk', nm: 'SDK' },
   ];
   renderGroupedBarChart('monthlySegmentChart', segDefs.map(s => s.nm), [
-    { label: 'June (Jul 3)', backgroundColor: '#5c6399', data: segDefs.map(s => juneBu[s.key].tot) },
-    { label: 'July (Jul 31)', backgroundColor: COLORS.vr, data: segDefs.map(s => julyBu[s.key].tot) },
+    { label: 'June', backgroundColor: '#5c6399', data: segDefs.map(s => juneBu[s.key].tot) },
+    { label: 'July', backgroundColor: COLORS.vr, data: segDefs.map(s => julyBu[s.key].tot) },
   ]);
 
   // ── full comparison table ──
