@@ -945,7 +945,10 @@ function renderLineTrend(canvasId, series, labelsFromRows) {
     data: { labels, datasets: series.map(s => ({ label: s.label, data: s.data, borderColor: s.color, backgroundColor: s.color + '22', tension: .3, fill: !!s.fill, pointRadius: 3 })) },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } }, y: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } } },
+      scales: {
+        x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } },
+        y: { ticks: { color: '#8b92c9', font: { size: 10 }, callback: v => v.toLocaleString('en-US') }, grid: { color: 'rgba(56,91,248,.08)' } }
+      },
       plugins: {
         legend: { labels: { color: '#e8eaf6', font: { size: 11 } } },
         datalabels: {
@@ -967,7 +970,10 @@ function renderBarChart(canvasId, labels, data, colors, title, signed) {
     data: { labels, datasets: [{ label: title || '', data, backgroundColor: colors }] },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } } },
+      scales: {
+        x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#8b92c9', font: { size: 10 }, callback: v => v.toLocaleString('en-US') }, grid: { color: 'rgba(56,91,248,.08)' } }
+      },
       plugins: {
         legend: { display: false },
         datalabels: {
@@ -990,7 +996,10 @@ function renderGroupedBarChart(canvasId, labels, datasets) {
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      scales: { x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { display: false } }, y: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { color: 'rgba(56,91,248,.08)' } } },
+      scales: {
+        x: { ticks: { color: '#8b92c9', font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: '#8b92c9', font: { size: 10 }, callback: v => v.toLocaleString('en-US') }, grid: { color: 'rgba(56,91,248,.08)' } }
+      },
       plugins: {
         legend: { labels: { color: '#e8eaf6', font: { size: 11 } } },
         datalabels: {
